@@ -1,40 +1,34 @@
-# Auditoria de Calls · Odisseia
+# Auditor de Calls
 
-App de auditoria de calls comerciais (Roteiro Demo, SPIN Selling e checklist A Montanha), com veredito por item, evidência obrigatória e histórico local.
+Plataforma de auditoria de calls comerciais. Organiza por cliente, permite frameworks de critérios totalmente customizáveis, dá veredito item a item com evidência obrigatória, e gera um ranking de aderência entre todas as calls.
 
-Essa é a versão standalone, sem depender do claude.ai. Ela chama a API da Anthropic direto do navegador usando a sua própria chave de API.
+Roda inteira no navegador, sem servidor. Usa sua própria chave da API Anthropic e guarda os dados em localStorage (por navegador).
 
 ## Como publicar no GitHub Pages
 
-1. Crie um repositório novo no GitHub (pode ser privado ou público, ver aviso de segurança abaixo).
-2. Suba o arquivo `index.html` deste pacote pra raiz do repositório.
-3. No repositório, vá em **Settings > Pages**.
-4. Em **Source**, escolha **Deploy from a branch**, branch `main`, pasta `/ (root)`.
-5. Salve. Em alguns minutos o GitHub te dá o link, algo como `https://seu-usuario.github.io/nome-do-repo/`.
+1. Crie um repositório novo no GitHub.
+2. Suba `index.html` e `README.md` pra raiz do repositório.
+3. Adicione também um arquivo vazio chamado `.nojekyll` na raiz (evita que o GitHub tente processar o site com Jekyll e sirva a página errada).
+4. Em **Settings > Pages**, escolha **Deploy from a branch**, branch `main`, pasta `/ (root)`. Salve.
+5. Em 1 a 2 minutos o link fica disponível em `https://seu-usuario.github.io/nome-do-repo/`.
 
-Pronto, é isso. Não tem build, não tem dependência de instalar nada, é só o HTML.
-
-## Como usar
+## Primeiro uso
 
 1. Abra o link publicado.
-2. Cole sua chave da API Anthropic no campo da lateral esquerda e clique em Salvar (pegue a chave em console.anthropic.com, seção API Keys).
-3. Preencha cliente, vendedor, data e o framework da call.
-4. Suba o arquivo da transcrição (.txt, .md ou .docx) ou cole o texto direto.
-5. Clique em Analisar call.
+2. Vá em **Configurações** na lateral, cole sua chave da API Anthropic (pegue em console.anthropic.com, seção API Keys) e salve.
+3. Crie um cliente clicando no `+` ao lado de "Clientes".
+4. Revise os frameworks em **Frameworks**: já vêm dois modelos prontos (Demonstração comercial e Checklist de forecast) além do SPIN Selling fixo, todos editáveis exceto o SPIN. Ajuste os itens pro roteiro real do seu cliente, ou crie frameworks novos do zero.
+5. Clique em **Nova auditoria**, escolha o cliente, marque os frameworks aplicáveis àquela call, suba ou cole a transcrição literal completa, e analise.
 
-O histórico de calls auditadas fica salvo no navegador (localStorage), não em nenhum servidor.
+## Organização
 
-## Aviso de segurança importante
+- **Clientes**: cada cliente tem sua própria pasta de calls na lateral. Renomeia e exclui pelos ícones que aparecem ao passar o mouse.
+- **Calls**: renomeável e excluível tanto na lateral quanto dentro do próprio relatório.
+- **Frameworks**: crie quantos quiser, com itens e pesos próprios. Um framework excluído não apaga as calls que já foram avaliadas com ele, só deixa de aparecer nas próximas.
+- **Ranking**: lista todas as calls ordenadas por aderência, com filtro por cliente e por vendedor.
 
-Esse app chama a API da Anthropic diretamente do navegador de quem estiver usando a página. Isso significa:
+## Aviso de segurança
 
-- A chave de API fica salva **apenas no localStorage do navegador de cada pessoa**, nunca é escrita no código nem enviada pra nenhum lugar além da Anthropic.
-- Só que, por ser uma chamada client side, qualquer pessoa com acesso ao link e disposta a abrir o DevTools do navegador consegue ver a chave que ela mesma digitou (a dela, não a de outras pessoas). Isso é aceitável pra uso pessoal ou de um time pequeno e de confiança, cada um com sua própria chave.
-- **Não distribua sua própria chave pra outras pessoas usarem nesse link.** Se quiser que o time inteiro use, cada pessoa deve ter e cadastrar a própria chave da Anthropic.
-- Se o repositório for público, qualquer pessoa pode abrir o link e usar o app (com a própria chave dela), mas ninguém vê a sua. Se isso for um problema, deixe o repositório e o Pages como privados (exige GitHub Pro/Team/Enterprise pra Pages privado) ou restrinja o acesso por outros meios.
+A chave de API fica salva apenas no localStorage do navegador de quem estiver usando a página, e as chamadas vão direto do navegador para a API da Anthropic. Isso é adequado pra uso pessoal ou de um time pequeno e de confiança, cada pessoa com sua própria chave. Não distribua sua chave pra outras pessoas usarem no mesmo link. Se o repositório for público, qualquer pessoa pode abrir o app e usar com a própria chave dela, mas ninguém vê a sua.
 
-## Diferenças em relação à versão que roda dentro do claude.ai
-
-- Aqui a análise usa sua própria chave de API e é cobrada diretamente na sua conta Anthropic, por uso.
-- O histórico é local ao navegador (some se você limpar os dados do site ou trocar de navegador/computador), não é compartilhado entre pessoas.
-- Fora isso, os critérios de auditoria, o cálculo de placar e o layout são idênticos à versão hospedada no claude.ai.
+Os dados (clientes, frameworks, calls, transcrições) também ficam só no localStorage: são por navegador e por computador, não sincronizam entre dispositivos e são perdidos se você limpar os dados do site.
