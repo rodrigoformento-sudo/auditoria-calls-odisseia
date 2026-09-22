@@ -1,0 +1,1092 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Auditor de Calls</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,500&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+<style>
+:root{
+  --bg:#15130f; --surface:#1c1913; --surface2:#242019; --surface3:#2c271e;
+  --border:#3a342a; --border-soft:#2a251d;
+  --text:#efe8db; --muted:#a89d8a; --dim:#736a5c;
+  --amber:#cf9a4c; --amber-soft:rgba(207,154,76,.14);
+  --teal:#6fa89a; --teal-soft:rgba(111,168,154,.14);
+  --red:#c1614a; --red-soft:rgba(193,97,74,.14);
+  --gray:#8b8272; --gray-soft:rgba(139,130,114,.14);
+  --serif:"Newsreader", Georgia, serif;
+  --sans:"IBM Plex Sans", -apple-system, sans-serif;
+  --mono:"IBM Plex Mono", ui-monospace, monospace;
+}
+*{box-sizing:border-box;}
+html{scroll-padding-top:env(safe-area-inset-top,0px);}
+body{
+  margin:0; font-family:var(--sans); background:var(--bg); color:var(--text);
+  padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+  min-height:100%; font-size:14px; line-height:1.5;
+}
+a{color:var(--teal);}
+button, input, select, textarea{font-family:var(--sans);}
+::selection{background:var(--amber-soft);}
+
+/* ---------- layout ---------- */
+.app{display:flex; min-height:100vh;}
+.sidebar{
+  width:290px; min-width:290px; background:var(--surface); border-right:1px solid var(--border-soft);
+  display:flex; flex-direction:column; height:100vh; position:sticky; top:0; align-self:flex-start;
+}
+.sidebar-scroll{overflow-y:auto; flex:1; padding:0 0 20px;}
+.brand{padding:22px 20px 16px; border-bottom:1px solid var(--border-soft);}
+.brand .mark{font-family:var(--serif); font-size:20px; font-weight:500; letter-spacing:.2px;}
+.brand .sub{color:var(--dim); font-size:11.5px; margin-top:3px;}
+
+.sidebar-nav{padding:14px 12px; border-bottom:1px solid var(--border-soft); display:flex; flex-direction:column; gap:2px;}
+.nav-link{
+  display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:6px; font-size:13px;
+  color:var(--muted); cursor:pointer; background:none; border:none; text-align:left; width:100%;
+}
+.nav-link:hover{color:var(--text); background:var(--surface2);}
+.nav-link.active{color:var(--text); background:var(--surface2); font-weight:600;}
+.nav-link .ic{width:15px; text-align:center; opacity:.85;}
+
+.new-audit-btn{
+  margin:14px 16px 4px; padding:10px 14px; border-radius:6px; border:1px solid var(--amber);
+  background:var(--amber-soft); color:var(--amber); font-weight:600; font-size:13px; cursor:pointer;
+  display:flex; align-items:center; justify-content:center; gap:8px;
+}
+.new-audit-btn:hover{background:rgba(207,154,76,.22);}
+
+.clients-section{padding:16px 16px 4px;}
+.clients-head{display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;}
+.clients-head span{font-size:11px; color:var(--dim); text-transform:none;}
+.icon-btn{background:none; border:none; color:var(--dim); cursor:pointer; font-size:14px; padding:2px 6px; border-radius:4px; line-height:1;}
+.icon-btn:hover{color:var(--text); background:var(--surface2);}
+.client-block{margin-bottom:2px;}
+.client-row{
+  display:flex; align-items:center; gap:6px; padding:7px 6px; border-radius:6px; cursor:pointer;
+}
+.client-row:hover{background:var(--surface2);}
+.client-row .chev{color:var(--dim); font-size:10px; width:10px;}
+.client-row .name{flex:1; font-size:13px; font-weight:500; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+.client-row .count{font-family:var(--mono); font-size:10.5px; color:var(--dim);}
+.client-row .row-actions{display:none; gap:2px;}
+.client-row:hover .row-actions{display:flex;}
+.calls-under{padding-left:22px; display:flex; flex-direction:column; gap:1px; margin-bottom:6px;}
+.call-row{
+  display:flex; align-items:center; gap:8px; padding:6px 8px; border-radius:5px; cursor:pointer; font-size:12.5px;
+  border-left:2px solid transparent;
+}
+.call-row:hover{background:var(--surface2);}
+.call-row.active{background:var(--surface2); border-left-color:var(--amber);}
+.call-row .cname{flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--text);}
+.call-row .cscore{font-family:var(--mono); font-size:11px; min-width:30px; text-align:right;}
+.call-row .row-actions{display:none; gap:2px;}
+.call-row:hover .row-actions{display:flex;}
+.empty-note{color:var(--dim); font-size:12px; padding:8px 6px; line-height:1.5;}
+.inline-edit{display:flex; gap:5px; align-items:center; width:100%;}
+.inline-edit input{flex:1; background:var(--surface3); border:1px solid var(--amber); color:var(--text); border-radius:4px; padding:4px 7px; font-size:12.5px;}
+
+.main{flex:1; min-width:0; padding:34px 40px 70px; max-width:980px; margin:0 auto; width:100%;}
+@media (max-width:900px){
+  .app{flex-direction:column;}
+  .sidebar{width:100%; min-width:0; height:auto; position:static;}
+  .main{padding:24px 18px 50px;}
+}
+
+/* ---------- typography helpers ---------- */
+h1.page-title{font-family:var(--serif); font-size:26px; font-weight:500; margin:0 0 4px;}
+.page-sub{color:var(--muted); font-size:13px; margin-bottom:26px;}
+.section-rule{border:none; border-top:1px solid var(--border-soft); margin:30px 0 18px;}
+.section-label{font-size:12px; color:var(--dim); margin-bottom:10px;}
+
+/* ---------- buttons / inputs ---------- */
+.btn{
+  appearance:none; border:1px solid var(--border); background:var(--surface2); color:var(--text);
+  padding:9px 15px; border-radius:6px; font-size:13px; font-weight:500; cursor:pointer;
+  display:inline-flex; align-items:center; justify-content:center; gap:8px;
+}
+.btn:hover{border-color:var(--muted);}
+.btn-primary{background:var(--amber); border-color:var(--amber); color:#1c1409; font-weight:600;}
+.btn-primary:hover{filter:brightness(1.07);}
+.btn-danger{color:var(--red); border-color:var(--red-soft);}
+.btn-danger:hover{background:var(--red-soft);}
+.btn:disabled{opacity:.45; cursor:not-allowed;}
+.btn-sm{padding:6px 11px; font-size:12px;}
+
+label{display:block; font-size:12px; color:var(--muted); margin-bottom:6px;}
+input[type=text], input[type=date], input[type=password], input[type=number], select, textarea{
+  width:100%; background:var(--surface2); border:1px solid var(--border); color:var(--text);
+  border-radius:6px; padding:9px 11px; font-size:13.5px; font-family:var(--sans);
+}
+textarea{resize:vertical; min-height:220px; line-height:1.55; font-family:var(--mono); font-size:12.5px;}
+input:focus, select:focus, textarea:focus{outline:none; border-color:var(--amber);}
+.field{margin-bottom:16px;}
+.form-grid{display:grid; grid-template-columns:1fr 1fr; gap:14px;}
+.form-grid-3{display:grid; grid-template-columns:1.4fr 1fr 1fr; gap:14px;}
+@media (max-width:640px){.form-grid, .form-grid-3{grid-template-columns:1fr;}}
+
+.check-row{display:flex; align-items:flex-start; gap:10px; padding:10px 12px; border:1px solid var(--border); border-radius:6px; margin-bottom:8px; cursor:pointer;}
+.check-row:hover{border-color:var(--muted);}
+.check-row input{margin-top:2px;}
+.check-row .cr-title{font-size:13px; font-weight:500;}
+.check-row .cr-meta{font-size:11.5px; color:var(--dim); margin-top:2px;}
+
+.dropzone{border:1.5px dashed var(--border); border-radius:6px; padding:16px; text-align:center; background:var(--surface2); cursor:pointer; font-size:12.5px; color:var(--muted); margin-bottom:10px;}
+.dropzone.over{border-color:var(--amber); color:var(--text);}
+.dropzone strong{color:var(--amber);}
+.file-chip{display:inline-flex; align-items:center; gap:8px; background:var(--surface2); border:1px solid var(--border); border-radius:5px; padding:5px 12px; font-size:12px; margin-bottom:10px; font-family:var(--mono);}
+.file-chip button{background:none; border:none; color:var(--dim); cursor:pointer; font-size:13px;}
+.or-sep{display:flex; align-items:center; gap:10px; color:var(--dim); font-size:11px; margin:2px 0 10px;}
+.or-sep::before, .or-sep::after{content:""; flex:1; height:1px; background:var(--border-soft);}
+
+.error-box{background:var(--red-soft); border:1px solid var(--red); color:#f0b6a6; padding:11px 14px; border-radius:6px; font-size:13px; margin-bottom:14px;}
+.hint{font-size:11.5px; color:var(--dim); margin-top:8px; line-height:1.55;}
+.spinner{width:14px; height:14px; border-radius:50%; border:2px solid rgba(239,232,219,.25); border-top-color:currentColor; animation:spin .7s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.loading-msg{display:flex; align-items:center; gap:10px; color:var(--muted); font-size:13px; margin-top:12px;}
+
+/* ---------- tags / verdict ---------- */
+.tag{font-family:var(--mono); font-size:11px; padding:2px 8px; border-radius:3px; border:1px solid currentColor; white-space:nowrap; display:inline-block;}
+.tag-cumprido{color:var(--teal);}
+.tag-parcial{color:var(--amber);}
+.tag-nao_cumprido{color:var(--red);}
+.tag-nao_evidenciavel{color:var(--gray);}
+
+/* ---------- report ---------- */
+.report-head{display:flex; justify-content:space-between; align-items:flex-start; gap:16px; margin-bottom:8px; flex-wrap:wrap;}
+.report-head h1{margin:0;}
+.report-meta{color:var(--muted); font-size:12.5px; margin-top:4px;}
+.report-meta .mono{font-family:var(--mono); color:var(--dim);}
+.report-actions{display:flex; gap:8px; flex-wrap:wrap;}
+
+.stat-row{display:flex; gap:26px; flex-wrap:wrap; margin:24px 0 6px; padding:18px 0; border-top:1px solid var(--border-soft); border-bottom:1px solid var(--border-soft);}
+.stat{min-width:80px;}
+.stat .n{font-family:var(--mono); font-size:24px; font-weight:600;}
+.stat .l{font-size:11px; color:var(--dim); margin-top:3px;}
+.stat.teal .n{color:var(--teal);} .stat.amber .n{color:var(--amber);} .stat.red .n{color:var(--red);} .stat.gray .n{color:var(--gray);}
+
+.verdict-box{background:var(--surface2); border-left:2px solid var(--amber); padding:14px 16px; font-size:13.5px; line-height:1.65; white-space:pre-wrap; border-radius:0 6px 6px 0;}
+
+.fw-block-title{font-family:var(--serif); font-size:16px; font-weight:500; margin:0 0 2px; display:flex; align-items:baseline; gap:10px;}
+.fw-block-title .fw-pct{font-family:var(--mono); font-size:12px; color:var(--muted); font-weight:400;}
+
+table{width:100%; border-collapse:collapse; font-size:12.6px;}
+th{text-align:left; color:var(--dim); font-weight:500; font-size:11px; padding:7px 9px; border-bottom:1px solid var(--border);}
+td{padding:9px; border-bottom:1px solid var(--border-soft); vertical-align:top; line-height:1.55;}
+tr:last-child td{border-bottom:none;}
+td.item-col{width:36%; font-weight:500;}
+td.badge-col{width:13%;}
+td.evid-col{color:var(--muted);}
+.table-wrap{overflow-x:auto; border:1px solid var(--border-soft); border-radius:6px; margin-bottom:22px;}
+
+.moment-box{border:1px solid var(--border-soft); border-radius:6px; padding:16px; margin-top:8px;}
+.moment-box .trecho{font-family:var(--serif); font-style:italic; font-size:15px; border-left:2px solid var(--teal); padding-left:14px; margin-bottom:10px; line-height:1.55;}
+.moment-box .comentario{font-size:13px; color:var(--muted); line-height:1.6;}
+
+.prep-list{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:7px;}
+.prep-list li{border:1px solid var(--border-soft); border-radius:5px; padding:10px 14px; font-size:13px; display:flex; gap:10px;}
+.prep-list li .n{font-family:var(--mono); color:var(--amber); font-weight:600;}
+
+/* ---------- ranking ---------- */
+.rank-filters{display:flex; gap:10px; margin-bottom:16px; flex-wrap:wrap;}
+.rank-filters select{width:auto; min-width:160px;}
+.rank-table td.rk{font-family:var(--mono); color:var(--dim); width:30px;}
+.rank-table tr{cursor:pointer;}
+.rank-table tr:hover td{background:var(--surface2);}
+.rank-table td.pct{font-family:var(--mono); font-weight:600;}
+
+/* ---------- frameworks manager ---------- */
+.fw-card{border:1px solid var(--border-soft); border-radius:6px; padding:16px 18px; margin-bottom:14px;}
+.fw-card-head{display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:10px;}
+.fw-card-head h3{font-family:var(--serif); font-size:16px; font-weight:500; margin:0;}
+.fw-card-head .fw-badge{font-family:var(--mono); font-size:10.5px; color:var(--dim); border:1px solid var(--border); padding:1px 7px; border-radius:3px;}
+.fw-item-row{display:flex; gap:8px; align-items:flex-start; padding:8px 0; border-top:1px solid var(--border-soft);}
+.fw-item-row:first-of-type{border-top:none;}
+.fw-item-row .txt{flex:1; font-size:13px;}
+.fw-item-row .peso{width:56px; font-family:var(--mono); font-size:12px;}
+.fw-additem{display:flex; gap:8px; margin-top:10px;}
+.fw-additem input[type=text]{flex:1;}
+.fw-additem input[type=number]{width:64px;}
+
+/* ---------- dashboard ---------- */
+.dash-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:1px; background:var(--border-soft); border:1px solid var(--border-soft); border-radius:6px; overflow:hidden; margin-bottom:30px;}
+.dash-cell{background:var(--surface); padding:18px 20px;}
+.dash-cell .n{font-family:var(--mono); font-size:28px; font-weight:600;}
+.dash-cell .l{font-size:11.5px; color:var(--dim); margin-top:4px;}
+.dash-empty{border:1px solid var(--border-soft); border-radius:6px; padding:30px; text-align:center; color:var(--muted); font-size:13.5px; line-height:1.7;}
+
+.settings-box{border:1px solid var(--border-soft); border-radius:6px; padding:18px 20px; max-width:520px; margin-bottom:20px;}
+.apikey-row{display:flex; gap:8px;}
+.apikey-status{font-size:12px; margin-top:9px;}
+.apikey-status.ok{color:var(--teal);}
+.apikey-status.missing{color:var(--amber);}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="mark">Auditor de Calls</div>
+      <div class="sub">Auditoria de execução comercial</div>
+    </div>
+    <div class="sidebar-nav">
+      <button class="nav-link" data-nav="dashboard"><span class="ic">◧</span> Visão geral</button>
+      <button class="nav-link" data-nav="ranking"><span class="ic">↕</span> Ranking</button>
+      <button class="nav-link" data-nav="frameworks"><span class="ic">▤</span> Frameworks</button>
+      <button class="nav-link" data-nav="settings"><span class="ic">⚙</span> Configurações</button>
+    </div>
+    <div class="sidebar-scroll">
+      <div class="new-audit-btn" id="btnNovaAuditoria">+ Nova auditoria</div>
+      <div class="clients-section">
+        <div class="clients-head"><span>Clientes</span><button class="icon-btn" id="btnAddClient" title="Novo cliente">+</button></div>
+        <div id="clientsTree"></div>
+      </div>
+    </div>
+  </aside>
+  <main class="main" id="main"></main>
+</div>
+
+<script>
+/* ============================================================
+   ESTADO E PERSISTÊNCIA
+   ============================================================ */
+const LS = {
+  api: "acall_api_key",
+  clients: "acall_clients",
+  frameworks: "acall_frameworks",
+  calls: "acall_calls",
+};
+function loadJSON(key, fallback){ try{ const raw = localStorage.getItem(key); return raw ? JSON.parse(raw) : fallback; }catch(e){ return fallback; } }
+function saveJSON(key, val){ try{ localStorage.setItem(key, JSON.stringify(val)); return true; }catch(e){ return false; } }
+function uid(prefix){ return (prefix||"id")+"_"+Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
+function getApiKey(){ return (localStorage.getItem(LS.api)||"").trim(); }
+
+let state = {
+  clients: [],
+  frameworks: [],
+  calls: [],
+  view: {type:"dashboard"},
+  expandedClients: {},
+};
+
+const SPIN_ID = "fw_spin_builtin";
+function seedFrameworksIfEmpty(){
+  const existing = loadJSON(LS.frameworks, null);
+  if(existing && existing.length){ return existing; }
+  const seeded = [
+    {
+      id: SPIN_ID, nome: "SPIN Selling", builtin:true, removivel:false,
+      itens: [
+        {id:uid("it"), texto:"Situação: mapeou o cenário atual do cliente (volume, processo, ferramentas em uso) antes de falar de solução", peso:1},
+        {id:uid("it"), texto:"Problema: fez o cliente verbalizar a dor com as próprias palavras dele", peso:1},
+        {id:uid("it"), texto:"Implicação: ampliou o custo do problema (o que acontece se continuar sem resolver, com que frequência)", peso:1},
+        {id:uid("it"), texto:"Necessidade de solução: confirmou a necessidade antes de apresentar qualquer solução", peso:1},
+      ]
+    },
+    {
+      id: uid("fw"), nome: "1ª Call", builtin:false, removivel:true,
+      itens: [
+        {id:uid("it"), texto:"[Abertura] Fez rapport e alinhou a dinâmica da call antes de qualquer pergunta de descoberta", peso:1},
+        {id:uid("it"), texto:"[Abertura] Fez o pitch curto da empresa/solução antes de entrar em descoberta", peso:1},
+        {id:uid("it"), texto:"[Abertura] Capturou a expectativa do cliente para a reunião antes de mostrar qualquer coisa", peso:1},
+        {id:uid("it"), texto:"[Descoberta] Não abriu nenhuma tela ou material antes de concluir a descoberta completa (gate de SPIN)", peso:1},
+        {id:uid("it"), texto:"[Bifurcação] Escolheu um foco único de apresentação com base na dor ouvida, sem apresentar múltiplas frentes com peso igual", peso:1},
+        {id:uid("it"), texto:"[Apresentação] Conectou a apresentação explicitamente à dor verbalizada pelo cliente, repetindo com as palavras dele", peso:1},
+        {id:uid("it"), texto:"[Apresentação] Usou um case ou prova concreta, com números brutos, para sustentar a proposta", peso:1},
+        {id:uid("it"), texto:"[Apresentação] Fez a validação pós apresentação (\"faz sentido pra vocês, consegue visualizar funcionando\")", peso:1},
+        {id:uid("it"), texto:"[Expansão] Apresentou uma segunda frente de valor como evolução natural, não como oferta separada", peso:1},
+        {id:uid("it"), texto:"[Expansão] Identificou e registrou o nível de interesse do cliente nessa segunda frente", peso:1},
+        {id:uid("it"), texto:"[Opinião do cliente] Fez as quatro perguntas de fechamento de opinião na ordem (resolveu a dor, confia na solução, o que pode impedir a parceria, quais os próximos passos)", peso:1},
+        {id:uid("it"), texto:"[Opinião do cliente] Tratou as objeções levantadas de forma direta e consistente, sem fugir do ponto", peso:1},
+        {id:uid("it"), texto:"[Implantação] Explicou a implantação de forma tranquilizadora, com prazo definido e o que é necessário do lado do cliente", peso:1},
+        {id:uid("it"), texto:"[Implantação] Mapeou as dependências técnicas e operacionais para o início (ferramentas atuais, ponto focal interno)", peso:1},
+        {id:uid("it"), texto:"[Proposta] Não apresentou proposta comercial ainda na primeira call", peso:1},
+        {id:uid("it"), texto:"[Proposta] Fez o cliente se comprometer verbalmente a querer receber a proposta", peso:1},
+        {id:uid("it"), texto:"[Proposta] Mapeou o rito de aprovação interno (quem decide, prazo, se há comitê)", peso:1},
+        {id:uid("it"), texto:"[Proposta] Se identificou outro decisor, tentou marcar uma interação com essa pessoa antes de encerrar", peso:1},
+        {id:uid("it"), texto:"[Próximos passos] Fez a CTA de dupla escolha, propondo duas opções concretas de próximo passo", peso:1},
+        {id:uid("it"), texto:"[Próximos passos] Saiu da call com data e hora definidas para o próximo passo, não ficou em \"te mando um e-mail\"", peso:1},
+        {id:uid("it"), texto:"[Próximos passos] Confirmou verbalmente os itens chave para registro em CRM (decisor, dor principal, solução recomendada, rito de aprovação, objeção principal)", peso:1},
+      ]
+    },
+    {
+      id: uid("fw"), nome: "A Montanha", builtin:false, removivel:true,
+      itens: [
+        {id:uid("it"), texto:"A data de fechamento prevista é para esse mês ou ciclo", peso:0.5},
+        {id:uid("it"), texto:"Já existe compromisso por escrito (e-mail ou mensagem) de fechamento nesse prazo", peso:1},
+        {id:uid("it"), texto:"O vendedor tem acesso direto ao decisor", peso:1.5},
+        {id:uid("it"), texto:"Foi apresentado ROI ou justificativa de valor para o decisor", peso:2},
+        {id:uid("it"), texto:"O vendedor sabe o budget disponível para o projeto", peso:0.5},
+        {id:uid("it"), texto:"Sabe em quanto tempo o cliente pretende estar usando a solução", peso:1},
+        {id:uid("it"), texto:"Já foi validado se outra área (TI, jurídico) precisa se envolver", peso:0.5},
+        {id:uid("it"), texto:"Já foi conversado quem conduz a implementação do lado do cliente", peso:1},
+        {id:uid("it"), texto:"Não foi identificado nenhum problema de aderência técnica ou de escopo", peso:1},
+        {id:uid("it"), texto:"Existe um cronograma validado com o cliente para o fechamento", peso:1.5},
+        {id:uid("it"), texto:"O cliente verbalizou que essa é a solução escolhida pela área de negócio", peso:1},
+        {id:uid("it"), texto:"Já foi validado qual centro de custo paga a conta", peso:0.5},
+        {id:uid("it"), texto:"O mapa de compras do cliente está claro (etapas, onde está, próximo passo)", peso:1},
+        {id:uid("it"), texto:"A dor principal e os gatilhos de fechamento estão validados", peso:0.5},
+      ]
+    },
+  ];
+  saveJSON(LS.frameworks, seeded);
+  return seeded;
+}
+
+function loadState(){
+  state.clients = loadJSON(LS.clients, []);
+  state.frameworks = seedFrameworksIfEmpty();
+  state.calls = loadJSON(LS.calls, []);
+}
+function persistClients(){ saveJSON(LS.clients, state.clients); }
+function persistFrameworks(){ saveJSON(LS.frameworks, state.frameworks); }
+function persistCalls(){ saveJSON(LS.calls, state.calls); }
+
+/* ============================================================
+   VEREDITOS E SCORE
+   ============================================================ */
+const VERDICT_LABEL = {cumprido:"cumprido", parcial:"parcial", nao_cumprido:"não cumprido", nao_evidenciavel:"não evidenciável"};
+function scoreCall(call){
+  let num=0, den=0, c=0,p=0,n=0,ne=0;
+  (call.itens||[]).forEach(it=>{
+    const peso = it.peso || 1;
+    den += peso;
+    if(it.veredito==="cumprido"){ num+=peso; c++; }
+    else if(it.veredito==="parcial"){ num+=peso*0.5; p++; }
+    else if(it.veredito==="nao_cumprido"){ n++; }
+    else { ne++; }
+  });
+  return {pct: den ? Math.round((num/den)*100) : 0, cumprido:c, parcial:p, nao_cumprido:n, nao_evidenciavel:ne, total:(call.itens||[]).length};
+}
+function pctColorClass(pct){ return pct>=75 ? "teal" : pct>=45 ? "amber" : "red"; }
+
+/* ============================================================
+   NAVEGAÇÃO / RENDER RAIZ
+   ============================================================ */
+function goTo(view){ state.view = view; render(); window.scrollTo(0,0); }
+function render(){ renderSidebar(); renderMain(); }
+
+document.querySelectorAll(".nav-link").forEach(btn=>{
+  btn.addEventListener("click", ()=> goTo({type: btn.dataset.nav}));
+});
+document.getElementById("btnNovaAuditoria").addEventListener("click", ()=> goTo({type:"novo"}));
+document.getElementById("btnAddClient").addEventListener("click", ()=>{
+  const nome = prompt("Nome do cliente:");
+  if(nome && nome.trim()){
+    const c = {id:uid("cli"), nome:nome.trim(), criado_em:new Date().toISOString()};
+    state.clients.push(c); persistClients();
+    state.expandedClients[c.id] = true;
+    render();
+  }
+});
+
+/* ============================================================
+   SIDEBAR
+   ============================================================ */
+function renderSidebar(){
+  document.querySelectorAll(".nav-link").forEach(btn=>{
+    btn.classList.toggle("active", state.view.type===btn.dataset.nav);
+  });
+  const tree = document.getElementById("clientsTree");
+  if(!state.clients.length){
+    tree.innerHTML = '<div class="empty-note">Nenhum cliente ainda. Clica no + pra criar o primeiro.</div>';
+    return;
+  }
+  tree.innerHTML = "";
+  state.clients.forEach(client=>{
+    const calls = state.calls.filter(c=>c.clientId===client.id).sort((a,b)=>(b.criado_em||"").localeCompare(a.criado_em||""));
+    const expanded = !!state.expandedClients[client.id];
+    const block = document.createElement("div");
+    block.className = "client-block";
+    const row = document.createElement("div");
+    row.className = "client-row";
+    row.innerHTML = `
+      <span class="chev">${expanded?"▾":"▸"}</span>
+      <span class="name">${escapeHtml(client.nome)}</span>
+      <span class="count">${calls.length}</span>
+      <span class="row-actions">
+        <button class="icon-btn" data-act="rename-client" title="Renomear">✎</button>
+        <button class="icon-btn" data-act="add-call" title="Nova auditoria pra esse cliente">+</button>
+        <button class="icon-btn" data-act="delete-client" title="Excluir cliente">✕</button>
+      </span>
+    `;
+    row.addEventListener("click", (e)=>{
+      if(e.target.closest("[data-act]")) return;
+      state.expandedClients[client.id] = !expanded;
+      render();
+    });
+    row.querySelector('[data-act="rename-client"]').addEventListener("click",(e)=>{
+      e.stopPropagation();
+      const novo = prompt("Renomear cliente:", client.nome);
+      if(novo && novo.trim()){ client.nome = novo.trim(); persistClients(); render(); }
+    });
+    row.querySelector('[data-act="add-call"]').addEventListener("click",(e)=>{
+      e.stopPropagation();
+      goTo({type:"novo", clientId:client.id});
+    });
+    row.querySelector('[data-act="delete-client"]').addEventListener("click",(e)=>{
+      e.stopPropagation();
+      if(confirm(`Excluir o cliente "${client.nome}"? Isso apaga também as ${calls.length} call(s) auditada(s) dele.`)){
+        state.clients = state.clients.filter(c=>c.id!==client.id);
+        state.calls = state.calls.filter(c=>c.clientId!==client.id);
+        persistClients(); persistCalls();
+        if(state.view.type==="call" && calls.some(c=>c.id===state.view.id)) goTo({type:"dashboard"});
+        else render();
+      }
+    });
+    block.appendChild(row);
+
+    if(expanded){
+      const under = document.createElement("div");
+      under.className = "calls-under";
+      if(!calls.length){
+        under.innerHTML = '<div class="empty-note">Sem calls ainda.</div>';
+      } else {
+        calls.forEach(call=>{
+          const sc = scoreCall(call);
+          const cr = document.createElement("div");
+          cr.className = "call-row" + (state.view.type==="call" && state.view.id===call.id ? " active":"");
+          cr.innerHTML = `
+            <span class="cname">${escapeHtml(call.nome)}</span>
+            <span class="cscore" style="color:var(--${pctColorClass(sc.pct)})">${sc.pct}%</span>
+            <span class="row-actions">
+              <button class="icon-btn" data-act="rename-call" title="Renomear">✎</button>
+              <button class="icon-btn" data-act="delete-call" title="Excluir">✕</button>
+            </span>
+          `;
+          cr.addEventListener("click",(e)=>{
+            if(e.target.closest("[data-act]")) return;
+            goTo({type:"call", id:call.id});
+          });
+          cr.querySelector('[data-act="rename-call"]').addEventListener("click",(e)=>{
+            e.stopPropagation();
+            const novo = prompt("Renomear call:", call.nome);
+            if(novo && novo.trim()){ call.nome = novo.trim(); persistCalls(); render(); }
+          });
+          cr.querySelector('[data-act="delete-call"]').addEventListener("click",(e)=>{
+            e.stopPropagation();
+            if(confirm(`Excluir a call "${call.nome}"? Essa ação não pode ser desfeita.`)){
+              state.calls = state.calls.filter(c=>c.id!==call.id);
+              persistCalls();
+              if(state.view.type==="call" && state.view.id===call.id) goTo({type:"dashboard"});
+              else render();
+            }
+          });
+          under.appendChild(cr);
+        });
+      }
+      block.appendChild(under);
+    }
+    tree.appendChild(block);
+  });
+}
+
+/* ============================================================
+   MAIN — DISPATCH
+   ============================================================ */
+function renderMain(){
+  const main = document.getElementById("main");
+  main.innerHTML = "";
+  if(state.view.type==="dashboard") return renderDashboard(main);
+  if(state.view.type==="novo") return renderNovaAuditoria(main);
+  if(state.view.type==="call") return renderCallReport(main, state.view.id);
+  if(state.view.type==="ranking") return renderRanking(main);
+  if(state.view.type==="frameworks") return renderFrameworksView(main);
+  if(state.view.type==="settings") return renderSettings(main);
+}
+
+/* ============================================================
+   DASHBOARD
+   ============================================================ */
+function renderDashboard(main){
+  const totalCalls = state.calls.length;
+  const totalClients = state.clients.length;
+  const media = totalCalls ? Math.round(state.calls.reduce((a,c)=>a+scoreCall(c).pct,0)/totalCalls) : 0;
+  const ranked = [...state.calls].sort((a,b)=> scoreCall(b).pct - scoreCall(a).pct).slice(0,5);
+
+  main.innerHTML = `
+    <h1 class="page-title">Visão geral</h1>
+    <div class="page-sub">Panorama das auditorias de call registradas.</div>
+    <div class="dash-grid">
+      <div class="dash-cell"><div class="n">${totalClients}</div><div class="l">Clientes</div></div>
+      <div class="dash-cell"><div class="n">${totalCalls}</div><div class="l">Calls auditadas</div></div>
+      <div class="dash-cell"><div class="n">${state.frameworks.length}</div><div class="l">Frameworks cadastrados</div></div>
+      <div class="dash-cell"><div class="n" style="color:var(--${totalCalls?pctColorClass(media):'muted'})">${totalCalls?media+'%':'—'}</div><div class="l">Aderência média</div></div>
+    </div>
+    ${totalCalls ? `
+      <div class="section-label">Top 5 calls por aderência</div>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Call</th><th>Cliente</th><th>Vendedor</th><th>Aderência</th></tr></thead>
+        <tbody>${ranked.map(call=>{
+          const cli = state.clients.find(c=>c.id===call.clientId);
+          const sc = scoreCall(call);
+          return `<tr style="cursor:pointer" data-goto="${call.id}"><td>${escapeHtml(call.nome)}</td><td>${escapeHtml(cli?cli.nome:"—")}</td><td>${escapeHtml(call.vendedor||"—")}</td><td class="mono" style="font-family:var(--mono);color:var(--${pctColorClass(sc.pct)})">${sc.pct}%</td></tr>`;
+        }).join("")}</tbody>
+      </table></div>
+    ` : `
+      <div class="dash-empty">Nenhuma call auditada ainda.<br>Cria um cliente na lateral e clica em "Nova auditoria" pra começar.</div>
+    `}
+  `;
+  main.querySelectorAll("[data-goto]").forEach(tr=> tr.addEventListener("click", ()=> goTo({type:"call", id:tr.dataset.goto})));
+}
+
+/* ============================================================
+   NOVA AUDITORIA
+   ============================================================ */
+function renderNovaAuditoria(main){
+  const preselectClient = state.view.clientId || (state.clients[0] && state.clients[0].id) || "";
+  main.innerHTML = `
+    <h1 class="page-title">Nova auditoria</h1>
+    <div class="page-sub">Cole a transcrição literal completa. Resumo de IA (Gemini, Otter etc) corta trechos e favorece o vendedor, não use.</div>
+    <div id="formError"></div>
+
+    <div class="form-grid-3">
+      <div class="field">
+        <label>Cliente</label>
+        <select id="fCliente">
+          ${state.clients.length ? state.clients.map(c=>`<option value="${c.id}" ${c.id===preselectClient?"selected":""}>${escapeHtml(c.nome)}</option>`).join("") : '<option value="">Nenhum cliente cadastrado</option>'}
+        </select>
+      </div>
+      <div class="field"><label>Vendedor</label><input type="text" id="fVendedor" placeholder="Nome do closer"></div>
+      <div class="field"><label>Data da call</label><input type="date" id="fData"></div>
+    </div>
+    ${!state.clients.length ? `<div class="hint" style="margin:-6px 0 16px;">Você precisa criar pelo menos um cliente antes. Usa o + do lado da palavra "Clientes" na lateral.</div>` : ""}
+
+    <div class="field">
+      <label>Nome da call</label>
+      <input type="text" id="fNome" placeholder="Ex: Reunião de descoberta, Demo 12/09...">
+    </div>
+
+    <div class="field">
+      <label>Frameworks aplicáveis</label>
+      <div id="frameworkChecks"></div>
+    </div>
+
+    <div class="field">
+      <label>Transcrição literal completa da call</label>
+      <div class="dropzone" id="dropzone">
+        <div id="dropzoneText">Arraste o arquivo da transcrição aqui (.txt, .md ou .docx) ou <strong>clique para escolher</strong></div>
+      </div>
+      <input type="file" id="fFile" accept=".txt,.md,.docx" style="display:none;">
+      <div id="fileChipArea"></div>
+      <div class="or-sep">ou cole o texto direto</div>
+      <textarea id="fTranscricao" placeholder="Cole aqui a transcrição completa, com falas identificadas por speaker sempre que possível..."></textarea>
+    </div>
+
+    <div style="display:flex; gap:12px; align-items:center;">
+      <button class="btn btn-primary" id="btnAnalisar">Analisar call</button>
+      <div id="loadingArea"></div>
+    </div>
+    <div class="hint">A análise usa os itens dos frameworks marcados acima e devolve veredito por item com evidência obrigatória. Pode levar entre 20 e 60 segundos.</div>
+  `;
+
+  const checksEl = document.getElementById("frameworkChecks");
+  checksEl.innerHTML = state.frameworks.map(fw=>`
+    <label class="check-row">
+      <input type="checkbox" value="${fw.id}" ${fw.builtin?"checked":""} class="fwCheck">
+      <div>
+        <div class="cr-title">${escapeHtml(fw.nome)}</div>
+        <div class="cr-meta">${fw.itens.length} itens${fw.builtin?" · framework padrão":""}</div>
+      </div>
+    </label>
+  `).join("");
+
+  document.getElementById("fCliente").addEventListener("change", ()=>{});
+  document.getElementById("btnAnalisar").addEventListener("click", handleAnalisar);
+  setupUpload();
+}
+
+function setupUpload(){
+  const zone = document.getElementById("dropzone");
+  const input = document.getElementById("fFile");
+  zone.addEventListener("click", ()=> input.click());
+  zone.addEventListener("dragover", e=>{ e.preventDefault(); zone.classList.add("over"); });
+  zone.addEventListener("dragleave", ()=> zone.classList.remove("over"));
+  zone.addEventListener("drop", e=>{
+    e.preventDefault(); zone.classList.remove("over");
+    if(e.dataTransfer.files && e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
+  });
+  input.addEventListener("change", e=>{
+    if(e.target.files && e.target.files[0]) handleFile(e.target.files[0]);
+  });
+}
+async function handleFile(file){
+  const chipArea = document.getElementById("fileChipArea");
+  const dzText = document.getElementById("dropzoneText");
+  const nameLower = file.name.toLowerCase();
+  dzText.textContent = "Lendo arquivo...";
+  try{
+    let text = "";
+    if(nameLower.endsWith(".docx")){
+      if(typeof mammoth === "undefined") throw new Error("leitor de .docx indisponível");
+      const arrayBuffer = await file.arrayBuffer();
+      const result = await mammoth.extractRawText({arrayBuffer});
+      text = result.value || "";
+    } else {
+      text = await file.text();
+    }
+    if(!text.trim()) throw new Error("arquivo vazio ou sem texto extraível");
+    document.getElementById("fTranscricao").value = text.trim();
+    chipArea.innerHTML = `<div class="file-chip">${escapeHtml(file.name)} <button type="button" id="btnClearFile">✕</button></div>`;
+    document.getElementById("btnClearFile").addEventListener("click", ()=>{
+      chipArea.innerHTML = "";
+      document.getElementById("fTranscricao").value = "";
+      dzText.innerHTML = 'Arraste o arquivo da transcrição aqui (.txt, .md ou .docx) ou <strong>clique para escolher</strong>';
+    });
+    dzText.innerHTML = `Arquivo carregado. Arraste outro pra substituir, ou <strong>clique para escolher</strong> outro.`;
+  }catch(err){
+    dzText.innerHTML = 'Arraste o arquivo da transcrição aqui (.txt, .md ou .docx) ou <strong>clique para escolher</strong>';
+    document.getElementById("formError").innerHTML = `<div class="error-box">Não consegui ler esse arquivo (${escapeHtml(err.message||"erro")}). Cola o texto direto na caixa abaixo.</div>`;
+  }
+}
+
+async function handleAnalisar(){
+  const errEl = document.getElementById("formError");
+  errEl.innerHTML = "";
+  const clientId = document.getElementById("fCliente").value;
+  const vendedor = document.getElementById("fVendedor").value.trim();
+  const dataCall = document.getElementById("fData").value;
+  let nome = document.getElementById("fNome").value.trim();
+  const transcricao = document.getElementById("fTranscricao").value.trim();
+  const fwIds = Array.from(document.querySelectorAll(".fwCheck:checked")).map(el=>el.value);
+
+  if(!clientId){ errEl.innerHTML = '<div class="error-box">Cria e seleciona um cliente antes de analisar.</div>'; return; }
+  if(!fwIds.length){ errEl.innerHTML = '<div class="error-box">Marca pelo menos um framework pra avaliar.</div>'; return; }
+  if(!transcricao || transcricao.length < 200){ errEl.innerHTML = '<div class="error-box">Cole a transcrição literal completa antes de analisar. Um texto muito curto normalmente é resumo, não transcrição.</div>'; return; }
+  if(!getApiKey()){ errEl.innerHTML = '<div class="error-box">Salva sua chave da API Anthropic em Configurações antes de analisar.</div>'; return; }
+  if(!nome){ nome = `${vendedor||"Call"} · ${dataCall||new Date().toLocaleDateString("pt-BR")}`; }
+
+  const btn = document.getElementById("btnAnalisar");
+  btn.disabled = true;
+  document.getElementById("loadingArea").innerHTML = '<div class="loading-msg"><div class="spinner"></div> Lendo a transcrição e cruzando com os frameworks...</div>';
+
+  try{
+    const selectedFrameworks = state.frameworks.filter(fw=>fwIds.includes(fw.id));
+    const flatItems = collectItemsForAudit(selectedFrameworks);
+    const parsed = await runAnalysis(flatItems, transcricao);
+    const normalizedItems = normalizeItems(parsed.itens, flatItems);
+
+    const call = {
+      id: uid("call"),
+      clientId, nome, vendedor, data_call: dataCall,
+      frameworkIds: fwIds,
+      itens: normalizedItems,
+      veredito_gestor: (parsed.veredito_gestor||"").toString(),
+      momento_decisivo: parsed.momento_decisivo || {trecho:"", comentario:""},
+      preparacao: Array.isArray(parsed.preparacao) ? parsed.preparacao.slice(0,6) : [],
+      transcricao,
+      criado_em: new Date().toISOString(),
+    };
+    state.calls.push(call);
+    persistCalls();
+    state.expandedClients[clientId] = true;
+    goTo({type:"call", id:call.id});
+  }catch(e){
+    errEl.innerHTML = `<div class="error-box">Não consegui concluir a análise agora (${escapeHtml(e && e.message ? e.message : "erro desconhecido")}). Tenta de novo em alguns segundos.</div>`;
+    btn.disabled = false;
+    document.getElementById("loadingArea").innerHTML = "";
+  }
+}
+
+function collectItemsForAudit(selectedFrameworks){
+  const flat = [];
+  selectedFrameworks.forEach(fw=>{
+    fw.itens.forEach(it=>{
+      flat.push({uidKey: fw.id+"::"+it.id, texto:it.texto, peso: it.peso||1, frameworkId:fw.id, frameworkNome:fw.nome});
+    });
+  });
+  return flat;
+}
+
+function buildPrompt(flatItems, transcricao){
+  let itemsBlock = "";
+  let currentFw = null;
+  flatItems.forEach(it=>{
+    if(it.frameworkNome !== currentFw){ itemsBlock += `\nFRAMEWORK "${it.frameworkNome}":\n`; currentFw = it.frameworkNome; }
+    itemsBlock += `- ${it.uidKey}${it.peso!==1?` (peso ${it.peso})`:""}: ${it.texto}\n`;
+  });
+  return `
+Você é um gestor comercial sênior fazendo auditoria rigorosa de execução de uma call de vendas B2B. Sua função é apontar exatamente o que aconteceu e o que não aconteceu, com evidência, sem suavizar.
+
+REGRAS DE VEREDITO, aplique para CADA item das listas abaixo:
+- "cumprido": claramente aconteceu, com evidência clara na transcrição.
+- "parcial": aconteceu em parte, ou de forma fraca.
+- "nao_cumprido": claramente não aconteceu, mesmo tendo oportunidade na call.
+- "nao_evidenciavel": não dá para confirmar nem negar com o material disponível.
+Nunca marque "cumprido" sem conseguir citar evidência específica. Na dúvida, marque "nao_evidenciavel" em vez de forçar um veredito para qualquer lado. A evidência deve ser um trecho literal ou paráfrase muito próxima da transcrição, nunca invente fala que não está lá.
+
+ITENS A AVALIAR (use o id exato de cada um, sem pular nenhum):
+${itemsBlock}
+
+RESPONDA APENAS COM UM JSON VÁLIDO (sem markdown, sem crases, sem texto antes ou depois), no formato exato:
+{
+  "itens": [{"id":"<uidKey exato>","veredito":"cumprido|parcial|nao_cumprido|nao_evidenciavel","evidencia":"trecho ou paráfrase curta da transcrição"}, ...],
+  "veredito_gestor": "um parágrafo direto de gestor, sem suavizar, juntando o que foi bem executado, o que não foi, e por que isso importa para o negócio",
+  "momento_decisivo": {"trecho": "o trecho mais decisivo da conversa, citado ou parafraseado de forma muito próxima do original", "comentario": "o que o vendedor fez bem ou mal exatamente nesse momento"},
+  "preparacao": ["ação concreta 1 ligada a um gap identificado", "ação concreta 2", "ação concreta 3"]
+}
+
+TRANSCRIÇÃO LITERAL DA CALL:
+"""
+${transcricao}
+"""
+`.trim();
+}
+
+async function runAnalysis(flatItems, transcricao){
+  const prompt = buildPrompt(flatItems, transcricao);
+  const response = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": getApiKey(),
+      "anthropic-version": "2023-06-01",
+      "anthropic-dangerous-direct-browser-access": "true"
+    },
+    body: JSON.stringify({
+      model: "claude-sonnet-4-6",
+      max_tokens: 4500,
+      messages: [{role:"user", content: prompt}]
+    })
+  });
+  if(!response.ok){
+    let msg = "erro " + response.status;
+    try{ const errBody = await response.json(); if(errBody && errBody.error && errBody.error.message) msg = errBody.error.message; }catch(e){}
+    throw new Error(msg);
+  }
+  const data = await response.json();
+  const textBlock = (data.content||[]).find(b=>b.type==="text");
+  if(!textBlock) throw new Error("resposta da API sem texto");
+  const clean = textBlock.text.replace(/```json|```/g,"").trim();
+  return JSON.parse(clean);
+}
+
+function normalizeItems(returned, flatItems){
+  const map = {};
+  (returned||[]).forEach(r=>{ if(r && r.id) map[r.id]=r; });
+  return flatItems.map(f=>{
+    const r = map[f.uidKey];
+    const veredito = r && VERDICT_LABEL[r.veredito] ? r.veredito : "nao_evidenciavel";
+    const evidencia = r && r.evidencia ? String(r.evidencia) : "Item não avaliado pela IA nesta rodada.";
+    return {uidKey:f.uidKey, texto:f.texto, peso:f.peso, frameworkId:f.frameworkId, frameworkNome:f.frameworkNome, veredito, evidencia};
+  });
+}
+
+/* ============================================================
+   RELATÓRIO DE UMA CALL
+   ============================================================ */
+function renderCallReport(main, callId){
+  const call = state.calls.find(c=>c.id===callId);
+  if(!call){ main.innerHTML = '<div class="dash-empty">Essa call não existe mais.</div>'; return; }
+  const client = state.clients.find(c=>c.id===call.clientId);
+  const sc = scoreCall(call);
+
+  const byFw = {};
+  call.itens.forEach(it=>{
+    if(!byFw[it.frameworkId]) byFw[it.frameworkId] = {nome:it.frameworkNome, itens:[]};
+    byFw[it.frameworkId].itens.push(it);
+  });
+
+  main.innerHTML = `
+    <div class="report-head">
+      <div>
+        <h1 class="page-title" id="reportTitle">${escapeHtml(call.nome)}</h1>
+        <div class="report-meta">${escapeHtml(client?client.nome:"Sem cliente")} <span class="mono">·</span> ${escapeHtml(call.vendedor||"vendedor não informado")} ${call.data_call?('<span class="mono">·</span> '+escapeHtml(call.data_call)):""} <span class="mono">·</span> auditado em ${new Date(call.criado_em).toLocaleString("pt-BR")}</div>
+      </div>
+      <div class="report-actions">
+        <button class="btn btn-sm" id="btnRename">Renomear</button>
+        <button class="btn btn-sm" id="btnExport">Exportar</button>
+        <button class="btn btn-sm btn-danger" id="btnDelete">Excluir</button>
+      </div>
+    </div>
+
+    <div class="stat-row">
+      <div class="stat ${pctColorClass(sc.pct)}"><div class="n">${sc.pct}%</div><div class="l">Aderência geral</div></div>
+      <div class="stat teal"><div class="n">${sc.cumprido}</div><div class="l">Cumprido</div></div>
+      <div class="stat amber"><div class="n">${sc.parcial}</div><div class="l">Parcial</div></div>
+      <div class="stat red"><div class="n">${sc.nao_cumprido}</div><div class="l">Não cumprido</div></div>
+      <div class="stat gray"><div class="n">${sc.nao_evidenciavel}</div><div class="l">Não evidenciável</div></div>
+    </div>
+
+    <div class="section-label" style="margin-top:26px;">Veredito do gestor</div>
+    <div class="verdict-box">${escapeHtml(call.veredito_gestor || "Sem veredito retornado.")}</div>
+
+    <hr class="section-rule">
+    ${Object.values(byFw).map(fw=> renderFwSection(fw)).join("")}
+
+    <div class="section-label">O momento mais importante da call</div>
+    <div class="moment-box">
+      <div class="trecho">${escapeHtml(call.momento_decisivo.trecho || "Não identificado.")}</div>
+      <div class="comentario">${escapeHtml(call.momento_decisivo.comentario || "")}</div>
+    </div>
+
+    <div class="section-label" style="margin-top:26px;">Preparação recomendada para a próxima call</div>
+    <ul class="prep-list">
+      ${(call.preparacao.length ? call.preparacao : ["Sem recomendações retornadas."]).map((p,i)=>`<li><span class="n">${i+1}</span> ${escapeHtml(p)}</li>`).join("")}
+    </ul>
+  `;
+
+  document.getElementById("btnRename").addEventListener("click", ()=>{
+    const novo = prompt("Renomear call:", call.nome);
+    if(novo && novo.trim()){ call.nome = novo.trim(); persistCalls(); render(); }
+  });
+  document.getElementById("btnDelete").addEventListener("click", ()=>{
+    if(confirm(`Excluir a call "${call.nome}"? Essa ação não pode ser desfeita.`)){
+      state.calls = state.calls.filter(c=>c.id!==call.id);
+      persistCalls();
+      goTo({type:"dashboard"});
+    }
+  });
+  document.getElementById("btnExport").addEventListener("click", ()=> exportarRelatorio(call, client));
+}
+
+function renderFwSection(fw){
+  let c=0, tot=fw.itens.length;
+  fw.itens.forEach(it=>{ if(it.veredito==="cumprido") c++; });
+  const pct = tot ? Math.round((c/tot)*100) : 0;
+  return `
+    <div class="fw-block-title">${escapeHtml(fw.nome)} <span class="fw-pct">${c}/${tot} cumpridos · ${pct}%</span></div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th class="item-col">Item</th><th class="badge-col">Veredito</th><th class="evid-col">Evidência</th></tr></thead>
+        <tbody>
+          ${fw.itens.map(it=>`
+            <tr>
+              <td class="item-col">${escapeHtml(it.texto)}${it.peso!==1?` <span style="color:var(--dim); font-family:var(--mono); font-size:11px;">(peso ${it.peso})</span>`:""}</td>
+              <td class="badge-col"><span class="tag tag-${it.veredito}">${VERDICT_LABEL[it.veredito]}</span></td>
+              <td class="evid-col">${escapeHtml(it.evidencia)}</td>
+            </tr>
+          `).join("")}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+function exportarRelatorio(call, client){
+  const sc = scoreCall(call);
+  let txt = `AUDITORIA DE CALL · ${call.nome}\n`;
+  txt += `Cliente: ${client?client.nome:"-"}  |  Vendedor: ${call.vendedor||"-"}  |  Data: ${call.data_call||"-"}\n`;
+  txt += `Auditado em: ${new Date(call.criado_em).toLocaleString("pt-BR")}\n\n`;
+  txt += `ADERÊNCIA GERAL: ${sc.pct}% (${sc.total} itens | cumprido ${sc.cumprido} | parcial ${sc.parcial} | não cumprido ${sc.nao_cumprido} | não evidenciável ${sc.nao_evidenciavel})\n`;
+  txt += `\nVEREDITO DO GESTOR\n${call.veredito_gestor}\n`;
+
+  const byFw = {};
+  call.itens.forEach(it=>{ if(!byFw[it.frameworkId]) byFw[it.frameworkId]={nome:it.frameworkNome, itens:[]}; byFw[it.frameworkId].itens.push(it); });
+  Object.values(byFw).forEach(fw=>{
+    txt += `\n${fw.nome.toUpperCase()}\n`;
+    fw.itens.forEach(it=>{ txt += `- [${VERDICT_LABEL[it.veredito]}] ${it.texto}\n  Evidência: ${it.evidencia}\n`; });
+  });
+
+  txt += `\nMOMENTO MAIS IMPORTANTE DA CALL\n${call.momento_decisivo.trecho}\n${call.momento_decisivo.comentario}\n`;
+  txt += `\nPREPARAÇÃO RECOMENDADA\n`;
+  call.preparacao.forEach((p,i)=> txt += `${i+1}. ${p}\n`);
+
+  const blob = new Blob([txt], {type:"text/plain;charset=utf-8"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = `auditoria-${slug(call.nome)}.txt`;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+function slug(s){ return (s||"call").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9]+/g,"-").replace(/(^-|-$)/g,"") || "call"; }
+
+/* ============================================================
+   RANKING
+   ============================================================ */
+function renderRanking(main){
+  main.innerHTML = `
+    <h1 class="page-title">Ranking</h1>
+    <div class="page-sub">Todas as calls auditadas, ordenadas por aderência aos frameworks aplicados.</div>
+    <div class="rank-filters">
+      <select id="rkCliente"><option value="">Todos os clientes</option>${state.clients.map(c=>`<option value="${c.id}">${escapeHtml(c.nome)}</option>`).join("")}</select>
+      <select id="rkVendedor"><option value="">Todos os vendedores</option></select>
+    </div>
+    <div id="rankTableWrap"></div>
+  `;
+  const vendSel = document.getElementById("rkVendedor");
+  const vendedores = [...new Set(state.calls.map(c=>c.vendedor).filter(Boolean))].sort();
+  vendedores.forEach(v=>{ const o=document.createElement("option"); o.value=v; o.textContent=v; vendSel.appendChild(o); });
+
+  function draw(){
+    const cliFilter = document.getElementById("rkCliente").value;
+    const vendFilter = document.getElementById("rkVendedor").value;
+    let list = state.calls.filter(c=> (!cliFilter || c.clientId===cliFilter) && (!vendFilter || c.vendedor===vendFilter));
+    list = list.map(c=>({call:c, sc:scoreCall(c)})).sort((a,b)=> b.sc.pct - a.sc.pct);
+    const wrap = document.getElementById("rankTableWrap");
+    if(!list.length){ wrap.innerHTML = '<div class="dash-empty">Nenhuma call encontrada com esse filtro.</div>'; return; }
+    wrap.innerHTML = `
+      <div class="table-wrap"><table class="rank-table">
+        <thead><tr><th></th><th>Call</th><th>Cliente</th><th>Vendedor</th><th>Data</th><th>Aderência</th></tr></thead>
+        <tbody>
+          ${list.map((row,i)=>{
+            const cli = state.clients.find(c=>c.id===row.call.clientId);
+            return `<tr data-goto="${row.call.id}">
+              <td class="rk">${i+1}</td>
+              <td>${escapeHtml(row.call.nome)}</td>
+              <td>${escapeHtml(cli?cli.nome:"—")}</td>
+              <td>${escapeHtml(row.call.vendedor||"—")}</td>
+              <td class="mono" style="font-family:var(--mono); color:var(--dim);">${escapeHtml(row.call.data_call||"—")}</td>
+              <td class="pct" style="color:var(--${pctColorClass(row.sc.pct)})">${row.sc.pct}%</td>
+            </tr>`;
+          }).join("")}
+        </tbody>
+      </table></div>
+    `;
+    wrap.querySelectorAll("[data-goto]").forEach(tr=> tr.addEventListener("click", ()=> goTo({type:"call", id:tr.dataset.goto})));
+  }
+  document.getElementById("rkCliente").addEventListener("change", draw);
+  document.getElementById("rkVendedor").addEventListener("change", draw);
+  draw();
+}
+
+/* ============================================================
+   FRAMEWORKS
+   ============================================================ */
+function renderFrameworksView(main){
+  main.innerHTML = `
+    <h1 class="page-title">Frameworks</h1>
+    <div class="page-sub">Os critérios usados pra avaliar as calls. Crie um framework por roteiro, checklist ou cliente que precisar de um modelo próprio.</div>
+    <button class="btn btn-primary" id="btnNovoFw" style="margin-bottom:22px;">+ Novo framework</button>
+    <div id="fwList"></div>
+  `;
+  document.getElementById("btnNovoFw").addEventListener("click", ()=>{
+    const nome = prompt("Nome do novo framework:");
+    if(nome && nome.trim()){
+      state.frameworks.push({id:uid("fw"), nome:nome.trim(), builtin:false, removivel:true, itens:[]});
+      persistFrameworks(); renderFrameworksView(main);
+    }
+  });
+  const listEl = document.getElementById("fwList");
+  state.frameworks.forEach(fw=>{
+    const card = document.createElement("div");
+    card.className = "fw-card";
+    card.innerHTML = `
+      <div class="fw-card-head">
+        <h3>${escapeHtml(fw.nome)}</h3>
+        <div style="display:flex; gap:8px; align-items:center;">
+          ${fw.builtin ? '<span class="fw-badge">padrão</span>' : ""}
+          ${!fw.builtin ? '<button class="icon-btn" data-act="rename">✎</button><button class="icon-btn" data-act="delete">✕</button>' : ""}
+        </div>
+      </div>
+      <div class="fw-items"></div>
+      ${!fw.builtin ? `
+        <div class="fw-additem">
+          <input type="text" placeholder="Novo item..." class="newItemTxt">
+          <input type="number" step="0.5" min="0.5" value="1" class="newItemPeso" title="Peso">
+          <button class="btn btn-sm" data-act="additem">Adicionar</button>
+        </div>
+      ` : `<div class="hint">Framework padrão (SPIN Selling), fica sempre disponível e não é editável.</div>`}
+    `;
+    const itemsEl = card.querySelector(".fw-items");
+    fw.itens.forEach(it=>{
+      const row = document.createElement("div");
+      row.className = "fw-item-row";
+      if(fw.builtin){
+        row.innerHTML = `<div class="txt">${escapeHtml(it.texto)}</div>`;
+      } else {
+        row.innerHTML = `
+          <div class="txt">${escapeHtml(it.texto)}</div>
+          <div style="font-family:var(--mono); font-size:12px; color:var(--dim); width:56px;">peso ${it.peso}</div>
+          <button class="icon-btn" data-act="delitem" data-item="${it.id}">✕</button>
+        `;
+      }
+      itemsEl.appendChild(row);
+    });
+    if(!fw.builtin){
+      card.querySelector('[data-act="rename"]').addEventListener("click", ()=>{
+        const novo = prompt("Renomear framework:", fw.nome);
+        if(novo && novo.trim()){ fw.nome = novo.trim(); persistFrameworks(); renderFrameworksView(main); }
+      });
+      card.querySelector('[data-act="delete"]').addEventListener("click", ()=>{
+        if(confirm(`Excluir o framework "${fw.nome}"? Calls já auditadas mantêm o histórico, só não vai mais aparecer pra novas auditorias.`)){
+          state.frameworks = state.frameworks.filter(f=>f.id!==fw.id);
+          persistFrameworks(); renderFrameworksView(main);
+        }
+      });
+      card.querySelectorAll('[data-act="delitem"]').forEach(btn=>{
+        btn.addEventListener("click", ()=>{
+          fw.itens = fw.itens.filter(it=>it.id!==btn.dataset.item);
+          persistFrameworks(); renderFrameworksView(main);
+        });
+      });
+      card.querySelector('[data-act="additem"]').addEventListener("click", ()=>{
+        const txtEl = card.querySelector(".newItemTxt");
+        const pesoEl = card.querySelector(".newItemPeso");
+        const texto = txtEl.value.trim();
+        const peso = parseFloat(pesoEl.value) || 1;
+        if(!texto) return;
+        fw.itens.push({id:uid("it"), texto, peso});
+        persistFrameworks(); renderFrameworksView(main);
+      });
+    }
+    listEl.appendChild(card);
+  });
+}
+
+/* ============================================================
+   CONFIGURAÇÕES
+   ============================================================ */
+function renderSettings(main){
+  main.innerHTML = `
+    <h1 class="page-title">Configurações</h1>
+    <div class="page-sub">Chave de API e gestão de dados locais.</div>
+
+    <div class="settings-box">
+      <label>Chave da API Anthropic</label>
+      <div class="apikey-row">
+        <input type="password" id="fApiKey" placeholder="sk-ant-...">
+        <button class="btn" id="btnSalvarKey">Salvar</button>
+      </div>
+      <div class="apikey-status" id="apiKeyStatus"></div>
+      <div class="hint">Fica salva só neste navegador (localStorage), nunca é enviada pra lugar nenhum além da API da Anthropic. Pegue a sua em console.anthropic.com, seção API Keys.</div>
+    </div>
+
+    <div class="settings-box">
+      <label>Dados locais</label>
+      <div class="hint" style="margin-top:0; margin-bottom:12px;">Clientes, frameworks e calls auditadas ficam salvos só neste navegador. Trocar de navegador ou computador, ou limpar os dados do site, apaga tudo.</div>
+      <button class="btn btn-danger btn-sm" id="btnReset">Apagar todos os dados</button>
+    </div>
+  `;
+  const input = document.getElementById("fApiKey");
+  const status = document.getElementById("apiKeyStatus");
+  const saved = getApiKey();
+  if(saved) input.value = saved;
+  function refreshStatus(){
+    if(getApiKey()){ status.textContent = "Chave salva neste navegador."; status.className = "apikey-status ok"; }
+    else { status.textContent = "Sem chave salva ainda, a análise não vai funcionar."; status.className = "apikey-status missing"; }
+  }
+  refreshStatus();
+  document.getElementById("btnSalvarKey").addEventListener("click", ()=>{
+    localStorage.setItem(LS.api, input.value.trim());
+    refreshStatus();
+  });
+  document.getElementById("btnReset").addEventListener("click", ()=>{
+    if(confirm("Apagar TODOS os clientes, frameworks e calls auditadas deste navegador? Não dá pra desfazer.")){
+      localStorage.removeItem(LS.clients);
+      localStorage.removeItem(LS.frameworks);
+      localStorage.removeItem(LS.calls);
+      loadState();
+      goTo({type:"dashboard"});
+    }
+  });
+}
+
+/* ============================================================
+   UTIL
+   ============================================================ */
+function escapeHtml(str){
+  return String(str==null?"":str).replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+}
+
+/* ============================================================
+   INIT
+   ============================================================ */
+loadState();
+render();
+</script>
+</body>
+</html>
