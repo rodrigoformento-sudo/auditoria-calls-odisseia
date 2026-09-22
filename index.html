@@ -1,0 +1,711 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Auditoria de Calls · Odisseia</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+<style>
+:root{
+  --bg:#0b0d10; --surface:#14171c; --surface2:#1b1f26; --border:#262b33;
+  --text:#e8eaed; --muted:#8b93a1; --accent:#5b8def;
+  --green:#2fbf71; --green-bg:rgba(47,191,113,.14);
+  --amber:#e0a72e; --amber-bg:rgba(224,167,46,.14);
+  --red:#e0524a; --red-bg:rgba(224,82,74,.14);
+  --gray:#8b93a1; --gray-bg:rgba(139,147,161,.14);
+  --radius:12px;
+  --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+*{box-sizing:border-box;}
+html{scroll-padding-top:env(safe-area-inset-top,0px);}
+body{
+  margin:0; font-family:var(--font); background:var(--bg); color:var(--text);
+  padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+  min-height:100%;
+}
+a{color:var(--accent);}
+.app{display:flex; min-height:100vh;}
+.sidebar{
+  width:300px; min-width:300px; border-right:1px solid var(--border); background:var(--surface);
+  padding:20px 16px; display:flex; flex-direction:column; gap:16px;
+  position:sticky; top:0; align-self:flex-start; height:100vh; overflow-y:auto;
+}
+.brand{display:flex; align-items:center; gap:10px; margin-bottom:4px;}
+.brand .dot{width:10px;height:10px;border-radius:50%;background:var(--accent);box-shadow:0 0 12px var(--accent);}
+.brand h1{font-size:15px; font-weight:700; margin:0; letter-spacing:.2px;}
+.brand span{display:block; font-size:11px; color:var(--muted); margin-top:2px;}
+.btn{
+  appearance:none; border:1px solid var(--border); background:var(--surface2); color:var(--text);
+  padding:10px 14px; border-radius:10px; font-size:13px; font-weight:600; cursor:pointer;
+  display:inline-flex; align-items:center; justify-content:center; gap:8px; transition:.15s;
+}
+.btn:hover{border-color:var(--accent);}
+.btn-primary{background:var(--accent); border-color:var(--accent); color:#0b0d10;}
+.btn-primary:hover{filter:brightness(1.08);}
+.btn:disabled{opacity:.5; cursor:not-allowed;}
+.btn-block{width:100%;}
+.history-list{display:flex; flex-direction:column; gap:6px; overflow-y:auto; flex:1;}
+.history-empty{font-size:12px; color:var(--muted); padding:12px 4px; line-height:1.5;}
+.history-item{
+  text-align:left; border:1px solid var(--border); background:var(--surface2); border-radius:10px;
+  padding:10px 12px; cursor:pointer; font-size:12.5px; color:var(--text);
+}
+.history-item:hover{border-color:var(--accent);}
+.history-item.active{border-color:var(--accent); background:rgba(91,141,239,.08);}
+.history-item .hi-top{display:flex; justify-content:space-between; gap:6px; font-weight:700; margin-bottom:3px;}
+.history-item .hi-meta{color:var(--muted); font-size:11px;}
+.history-item .hi-score{font-size:11px; margin-top:5px; color:var(--muted);}
+.main{flex:1; padding:28px 32px 60px; max-width:1100px; margin:0 auto; width:100%;}
+h2{font-size:20px; margin:0 0 4px;}
+.subtitle{color:var(--muted); font-size:13px; margin-bottom:22px;}
+.card{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:20px;}
+.form-grid{display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:14px;}
+label{display:block; font-size:12px; font-weight:600; color:var(--muted); margin-bottom:6px;}
+input[type=text], input[type=date], select, textarea{
+  width:100%; background:var(--surface2); border:1px solid var(--border); color:var(--text);
+  border-radius:8px; padding:10px 12px; font-size:13.5px; font-family:var(--font);
+}
+textarea{resize:vertical; min-height:220px; line-height:1.5;}
+.dropzone{
+  border:1.5px dashed var(--border); border-radius:10px; padding:16px; text-align:center;
+  background:var(--surface2); cursor:pointer; font-size:12.5px; color:var(--muted); margin-bottom:10px;
+  transition:.15s;
+}
+.dropzone.over{border-color:var(--accent); background:rgba(91,141,239,.08); color:var(--text);}
+.dropzone strong{color:var(--accent);}
+.file-chip{
+  display:inline-flex; align-items:center; gap:8px; background:var(--surface2); border:1px solid var(--border);
+  border-radius:999px; padding:5px 12px; font-size:12px; margin-bottom:10px;
+}
+.file-chip button{background:none; border:none; color:var(--muted); cursor:pointer; font-size:14px; padding:0; line-height:1;}
+.file-chip button:hover{color:var(--red);}
+.or-sep{display:flex; align-items:center; gap:10px; color:var(--muted); font-size:11px; margin:2px 0 10px; text-transform:uppercase; letter-spacing:.4px;}
+.or-sep::before, .or-sep::after{content:""; flex:1; height:1px; background:var(--border);}
+input:focus, select:focus, textarea:focus{outline:none; border-color:var(--accent);}
+.field{margin-bottom:14px;}
+.radio-row{display:flex; gap:10px; flex-wrap:wrap;}
+.radio-opt{
+  border:1px solid var(--border); background:var(--surface2); border-radius:10px; padding:10px 14px;
+  font-size:12.5px; cursor:pointer; display:flex; align-items:center; gap:8px;
+}
+.radio-opt.checked{border-color:var(--accent); background:rgba(91,141,239,.1);}
+.radio-opt input{margin:0;}
+.actions-row{display:flex; gap:10px; align-items:center; margin-top:6px;}
+.hint{font-size:11.5px; color:var(--muted); margin-top:6px; line-height:1.5;}
+.error-box{background:var(--red-bg); border:1px solid var(--red); color:#ffb3ae; padding:12px 14px; border-radius:10px; font-size:13px; margin-bottom:14px;}
+.spinner{width:16px; height:16px; border-radius:50%; border:2px solid rgba(255,255,255,.25); border-top-color:currentColor; animation:spin .7s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.loading-msg{display:flex; align-items:center; gap:10px; color:var(--muted); font-size:13px; margin-top:12px;}
+
+/* results */
+.result-header{display:flex; justify-content:space-between; align-items:flex-start; gap:16px; margin-bottom:18px; flex-wrap:wrap;}
+.result-title h3{margin:0 0 4px; font-size:18px;}
+.result-title .meta{color:var(--muted); font-size:12.5px;}
+.scoreboard{display:grid; grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); gap:12px; margin:18px 0;}
+.score-card{background:var(--surface2); border:1px solid var(--border); border-radius:10px; padding:14px; text-align:center;}
+.score-card .num{font-size:26px; font-weight:800; line-height:1;}
+.score-card .lbl{font-size:11px; color:var(--muted); margin-top:6px; text-transform:uppercase; letter-spacing:.4px;}
+.score-card.green .num{color:var(--green);}
+.score-card.amber .num{color:var(--amber);}
+.score-card.red .num{color:var(--red);}
+.score-card.gray .num{color:var(--gray);}
+.score-card.total .num{color:var(--text);}
+
+.section-title{font-size:14px; font-weight:700; margin:26px 0 10px; display:flex; align-items:center; gap:8px;}
+.section-title .pct{font-weight:600; color:var(--muted); font-size:12px;}
+
+.verdict-box{background:var(--surface2); border-left:3px solid var(--accent); border-radius:8px; padding:14px 16px; font-size:13.5px; line-height:1.6; white-space:pre-wrap;}
+
+table{width:100%; border-collapse:collapse; font-size:12.8px;}
+th{text-align:left; color:var(--muted); font-weight:600; font-size:11px; text-transform:uppercase; letter-spacing:.3px; padding:8px 10px; border-bottom:1px solid var(--border);}
+td{padding:10px; border-bottom:1px solid var(--border); vertical-align:top; line-height:1.5;}
+tr:last-child td{border-bottom:none;}
+td.item-col{width:34%; font-weight:600;}
+td.badge-col{width:14%;}
+td.evid-col{color:var(--muted);}
+.table-wrap{overflow-x:auto; border:1px solid var(--border); border-radius:10px;}
+.badge{display:inline-block; padding:3px 10px; border-radius:999px; font-size:11px; font-weight:700; white-space:nowrap;}
+.badge-cumprido{background:var(--green-bg); color:var(--green);}
+.badge-parcial{background:var(--amber-bg); color:var(--amber);}
+.badge-nao_cumprido{background:var(--red-bg); color:var(--red);}
+.badge-nao_evidenciavel{background:var(--gray-bg); color:var(--gray);}
+
+.moment-card{background:var(--surface2); border:1px solid var(--border); border-radius:10px; padding:16px; margin-top:10px;}
+.moment-card .trecho{font-style:italic; color:var(--text); border-left:3px solid var(--accent); padding-left:12px; margin-bottom:10px; font-size:13.5px; line-height:1.6;}
+.moment-card .comentario{font-size:13px; color:var(--muted); line-height:1.6;}
+
+.prep-list{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:8px;}
+.prep-list li{background:var(--surface2); border:1px solid var(--border); border-radius:8px; padding:10px 14px; font-size:13px; display:flex; gap:10px;}
+.prep-list li .n{color:var(--accent); font-weight:800;}
+
+.top-actions{display:flex; gap:10px; flex-wrap:wrap;}
+.badge-tipo{font-size:10.5px; text-transform:uppercase; letter-spacing:.3px; color:var(--muted); border:1px solid var(--border); border-radius:6px; padding:2px 8px;}
+
+.apikey-box{border:1px solid var(--border); background:var(--surface2); border-radius:10px; padding:12px; font-size:12px;}
+.apikey-box label{margin-bottom:6px;}
+.apikey-row{display:flex; gap:6px;}
+.apikey-row input{font-family:monospace; font-size:12px;}
+.apikey-status{font-size:11px; margin-top:8px; line-height:1.5;}
+.apikey-status.ok{color:var(--green);}
+.apikey-status.missing{color:var(--amber);}
+.apikey-note{font-size:10.5px; color:var(--muted); margin-top:8px; line-height:1.5;}
+
+@media (max-width:860px){
+  .app{flex-direction:column;}
+  .sidebar{width:100%; min-width:0; height:auto; position:static; border-right:none; border-bottom:1px solid var(--border);}
+  .main{padding:20px 16px 50px;}
+  .form-grid{grid-template-columns:1fr;}
+}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="dot"></div>
+      <div>
+        <h1>Auditoria de Calls</h1>
+        <span>Odisseia AI</span>
+      </div>
+    </div>
+    <button class="btn btn-primary btn-block" id="btnNova">+ Nova auditoria</button>
+
+    <div class="apikey-box">
+      <label>Chave da API Anthropic</label>
+      <div class="apikey-row">
+        <input type="password" id="fApiKey" placeholder="sk-ant-...">
+        <button class="btn" id="btnSalvarKey">Salvar</button>
+      </div>
+      <div class="apikey-status" id="apiKeyStatus"></div>
+      <div class="apikey-note">Fica salva só no seu navegador (localStorage), nunca é enviada pra lugar nenhum além da API da Anthropic. Pegue a sua em console.anthropic.com.</div>
+    </div>
+
+    <div>
+      <label style="margin-bottom:8px;">Histórico</label>
+      <div class="history-list" id="historyList">
+        <div class="history-empty">Carregando histórico...</div>
+      </div>
+    </div>
+  </aside>
+
+  <main class="main" id="main">
+    <!-- preenchido via JS -->
+  </main>
+
+</div>
+
+<script>
+/* ============ ITENS FIXOS DOS FRAMEWORKS ============ */
+
+const ROTEIRO_ITEMS = [
+  {id:"r1", etapa:"1. Abertura", texto:"Fez rapport e buscou informação relevante sobre o lead antes de entrar nas perguntas (não entrou sem briefing)"},
+  {id:"r2", etapa:"1. Abertura", texto:"Alinhou a dinâmica da call, avisando que faria perguntas antes de mostrar o produto"},
+  {id:"r3", etapa:"1. Abertura", texto:"Fez o pitch de 30 segundos sobre a Odisseia antes de qualquer pergunta de descoberta"},
+  {id:"r4", etapa:"1. Abertura", texto:"Capturou a expectativa do cliente para a reunião antes de mostrar qualquer tela"},
+  {id:"r5", etapa:"2. Descoberta", texto:"Não abriu nenhuma tela do produto antes de concluir a descoberta (SPIN completo)"},
+  {id:"r6", etapa:"3. Bifurcação e Demo", texto:"Escolheu um foco único para a demo (Penélope ou Synthetos) com base na dor ouvida, sem apresentar os dois produtos com peso igual"},
+  {id:"r7", etapa:"3. Bifurcação e Demo", texto:"Conectou o pitch do produto explicitamente à dor que o cliente verbalizou, repetindo a dor com as palavras do próprio cliente"},
+  {id:"r8", etapa:"3. Bifurcação e Demo", texto:"Usou o case âncora com números brutos (não em porcentagem)"},
+  {id:"r9", etapa:"3. Bifurcação e Demo", texto:"Fez a validação pós demo (\"faz sentido pra vocês / consegue visualizar funcionando\")"},
+  {id:"r10", etapa:"4. Cross-sell", texto:"Apresentou o segundo produto como evolução natural do primeiro, não como oferta separada"},
+  {id:"r11", etapa:"4. Cross-sell", texto:"Identificou e registrou o nível de interesse do cliente no segundo produto"},
+  {id:"r12", etapa:"5. Opinião do cliente", texto:"Fez as quatro perguntas de fechamento de opinião (resolveu a dor, confia na solução, o que pode impedir a parceria, quais os próximos passos)"},
+  {id:"r13", etapa:"5. Opinião do cliente", texto:"Tratou as objeções levantadas de forma consistente com o roteiro (bot já existe, preço alto, preciso ver com fulano, não é o momento)"},
+  {id:"r14", etapa:"6. Implantação", texto:"Explicou a implantação de forma tranquilizadora (plug and play, sem TI, prazo definido)"},
+  {id:"r15", etapa:"6. Implantação", texto:"Mapeou as dependências técnicas (WhatsApp atual, quantidade de contas, ponto focal interno)"},
+  {id:"r16", etapa:"7. Proposta", texto:"Não apresentou proposta comercial ainda na primeira call"},
+  {id:"r17", etapa:"7. Proposta", texto:"Fez o cliente se comprometer verbalmente a querer receber a proposta"},
+  {id:"r18", etapa:"7. Proposta", texto:"Mapeou o rito de aprovação interno (quem decide, prazo, se há comitê ou outro aprovador)"},
+  {id:"r19", etapa:"7. Proposta", texto:"Se identificou outro decisor, tentou marcar uma interação com essa pessoa antes de encerrar a call"},
+  {id:"r20", etapa:"8. Próximos passos", texto:"Fez a CTA de dupla escolha, propondo duas opções concretas de próximo passo"},
+  {id:"r21", etapa:"8. Próximos passos", texto:"Saiu da call com data e hora definidas para o próximo passo (não ficou em \"te mando um email\")"},
+  {id:"r22", etapa:"8. Próximos passos", texto:"Confirmou verbalmente os itens chave para registro no CRM (decisor, dor principal verbalizada, volume/ticket, produto recomendado, rito de aprovação, objeção principal)"},
+];
+
+const SPIN_ITEMS = [
+  {id:"s1", letra:"S", texto:"Situação: mapeou o cenário atual (volume de leads por mês, canais, tempo médio de primeiro contato, se usa WhatsApp pessoal/Business/plataforma)"},
+  {id:"s2", letra:"P", texto:"Problema: fez o cliente verbalizar a dor (leads sem resposta fora do horário, sem visibilidade do que o time faz, histórico perdido)"},
+  {id:"s3", letra:"I", texto:"Implicação: ampliou o custo do problema (o que acontece quando o lead fica sem resposta, se já perderam negócio por isso, com que frequência)"},
+  {id:"s4", letra:"N", texto:"Necessidade de solução: confirmou a necessidade antes de mostrar o produto (perguntou se resolver isso mudaria os resultados, o que uma solução ideal precisaria fazer)"},
+];
+
+const MONTANHA_ITEMS = [
+  {id:"m1", texto:"A data de fechamento prevista para essa oportunidade é para esse mês?", peso:0.5},
+  {id:"m2", texto:"Já trocou e-mails/whats com o lead firmando compromisso de fechamento para esse mês?", peso:1},
+  {id:"m3", texto:"Tem acesso ao decisor?", peso:1.5},
+  {id:"m4", texto:"Fez a apresentação da planilha ROI para o decisor do projeto?", peso:2},
+  {id:"m5", texto:"Sabe o budget que o lead tem para o projeto?", peso:0.5},
+  {id:"m7", texto:"Sabe em quanto tempo o lead pretende estar usando a ferramenta?", peso:1},
+  {id:"m8", texto:"Já concluiu e validou se o time de TI precisa se envolver no projeto?", peso:0.5},
+  {id:"m9", texto:"Já foi conversado sobre qual área e pessoa conduzirá a implementação do projeto?", peso:1},
+  {id:"m10", texto:"Não foi identificado nenhum item de não escopo ou problema de aderência no projeto técnico?", peso:1},
+  {id:"m11", texto:"Tem um cronograma validado com o lead, englobando todas as atividades que ele e o lead devem realizar para o fechamento?", peso:1.5},
+  {id:"m12", texto:"O lead verbalizou que a solução é a escolhida pela área de negócios?", peso:1},
+  {id:"m13", texto:"Já validou qual centro de custo vai pagar a conta?", peso:0.5},
+  {id:"m14", texto:"Validou o mapa de compras com o cliente (qual o processo, onde está, qual o próximo passo, o que pode fazer para dar esse passo)?", peso:1},
+  {id:"m15", texto:"Já validou a dor matriz e quais gatilhos serão usados para o fechamento do projeto?", peso:0.5},
+];
+const MONTANHA_MAX = MONTANHA_ITEMS.reduce((a,i)=>a+i.peso,0); // 13.5 (item 6 do template original ficou sem texto e foi excluído)
+
+const VERDICT_LABEL = {
+  cumprido:"Cumprido", parcial:"Parcial", nao_cumprido:"Não cumprido", nao_evidenciavel:"Não evidenciável"
+};
+
+/* ============ ESTADO ============ */
+const LS_KEY_API = "auditoria_odisseia_api_key";
+const LS_KEY_HISTORY = "auditoria_odisseia_historico";
+let historyDocs = [];
+let currentDoc = null; // { id, ...dados salvos }
+
+/* ============ CHAVE DE API ============ */
+function getApiKey(){ return (localStorage.getItem(LS_KEY_API) || "").trim(); }
+function setupApiKeyBox(){
+  const input = document.getElementById("fApiKey");
+  const status = document.getElementById("apiKeyStatus");
+  const saved = getApiKey();
+  if(saved) input.value = saved;
+  function refreshStatus(){
+    if(getApiKey()){ status.textContent = "Chave salva neste navegador."; status.className = "apikey-status ok"; }
+    else { status.textContent = "Sem chave salva ainda, a análise não vai funcionar."; status.className = "apikey-status missing"; }
+  }
+  refreshStatus();
+  document.getElementById("btnSalvarKey").addEventListener("click", ()=>{
+    localStorage.setItem(LS_KEY_API, input.value.trim());
+    refreshStatus();
+  });
+}
+
+/* ============ INIT ============ */
+function init(){
+  setupApiKeyBox();
+  renderForm();
+  loadHistory();
+}
+document.getElementById("btnNova").addEventListener("click", ()=>{ currentDoc=null; renderForm(); setActiveHistory(null); });
+
+/* ============ HISTÓRICO (localStorage) ============ */
+function loadHistory(){
+  try{
+    const raw = localStorage.getItem(LS_KEY_HISTORY);
+    historyDocs = raw ? JSON.parse(raw) : [];
+    historyDocs.sort((a,b)=> (b.criado_em||"").localeCompare(a.criado_em||""));
+  }catch(e){ historyDocs = []; }
+  renderHistoryList();
+}
+function renderHistoryList(){
+  const listEl = document.getElementById("historyList");
+  if(!historyDocs.length){
+    listEl.innerHTML = '<div class="history-empty">Nenhuma call auditada ainda. Cole a transcrição ao lado para começar.</div>';
+    return;
+  }
+  listEl.innerHTML = "";
+  historyDocs.forEach(doc=>{
+    const el = document.createElement("div");
+    el.className = "history-item" + (currentDoc && currentDoc.id===doc.id ? " active":"");
+    el.dataset.id = doc.id;
+    const data = doc.data_call || "";
+    el.innerHTML = `
+      <div class="hi-top"><span>${escapeHtml(doc.cliente||"Sem nome")}</span></div>
+      <div class="hi-meta">${escapeHtml(doc.vendedor||"")} ${data?("· "+escapeHtml(data)):""}</div>
+      <div class="hi-score">${escapeHtml(scoreSummaryText(doc))}</div>
+    `;
+    el.addEventListener("click", ()=>{ currentDoc = doc; renderResults(doc); setActiveHistory(doc.id); });
+    listEl.appendChild(el);
+  });
+}
+function setActiveHistory(id){
+  document.querySelectorAll(".history-item").forEach(el=>{
+    el.classList.toggle("active", el.dataset.id===id);
+  });
+}
+function scoreSummaryText(doc){
+  const c = countVerdicts(doc.itens_roteiro||[]).cumprido + countVerdicts(doc.itens_spin||[]).cumprido + countVerdicts(doc.itens_montanha||[]).cumprido;
+  const t = (doc.itens_roteiro||[]).length + (doc.itens_spin||[]).length + (doc.itens_montanha||[]).length;
+  return t ? `${c}/${t} itens cumpridos` : "";
+}
+
+/* ============ FORM ============ */
+function renderForm(){
+  const main = document.getElementById("main");
+  main.innerHTML = `
+    <h2>Nova auditoria de call</h2>
+    <div class="subtitle">Cole a transcrição literal completa. Nunca use resumo de IA (Gemini, Otter, etc), o resumo esconde onde o vendedor realmente perguntou ou não o que precisava.</div>
+    <div class="card">
+      <div id="formError"></div>
+      <div class="form-grid">
+        <div class="field"><label>Cliente / oportunidade</label><input type="text" id="fCliente" placeholder="Ex: Movida, GreyLogix..."></div>
+        <div class="field"><label>Vendedor</label><input type="text" id="fVendedor" placeholder="Nome do closer"></div>
+        <div class="field"><label>Data da call</label><input type="date" id="fData"></div>
+        <div class="field"><label>Framework aplicável</label>
+          <select id="fFramework">
+            <option value="demo">Demo comercial (Roteiro Demo + SPIN)</option>
+            <option value="forecast">Negociação avançada / Forecast (Checklist A Montanha + SPIN)</option>
+            <option value="ambos">Ambos frameworks (Roteiro + Montanha + SPIN)</option>
+          </select>
+        </div>
+      </div>
+      <div class="field">
+        <label>Transcrição literal completa da call</label>
+        <div class="dropzone" id="dropzone">
+          <div id="dropzoneText">Arraste o arquivo da transcrição aqui (.txt, .md ou .docx) ou <strong>clique para escolher</strong></div>
+        </div>
+        <input type="file" id="fFile" accept=".txt,.md,.docx" style="display:none;">
+        <div id="fileChipArea"></div>
+        <div class="or-sep">ou cole o texto direto</div>
+        <textarea id="fTranscricao" placeholder="Cole aqui a transcrição completa, com falas identificadas por speaker sempre que possível..."></textarea>
+      </div>
+      <div class="actions-row">
+        <button class="btn btn-primary" id="btnAnalisar">Analisar call</button>
+        <div id="loadingArea"></div>
+      </div>
+      <div class="hint">A análise roda com IA a partir dos critérios internos da Odisseia (roteiro de demo e checklist A Montanha) e do framework SPIN, com veredito por item e evidência obrigatória. Isso pode levar entre 20 e 60 segundos.</div>
+    </div>
+  `;
+  document.getElementById("btnAnalisar").addEventListener("click", handleAnalisar);
+  setupUpload();
+}
+
+/* ============ UPLOAD DE TRANSCRIÇÃO ============ */
+function setupUpload(){
+  const zone = document.getElementById("dropzone");
+  const input = document.getElementById("fFile");
+  zone.addEventListener("click", ()=> input.click());
+  zone.addEventListener("dragover", e=>{ e.preventDefault(); zone.classList.add("over"); });
+  zone.addEventListener("dragleave", ()=> zone.classList.remove("over"));
+  zone.addEventListener("drop", e=>{
+    e.preventDefault(); zone.classList.remove("over");
+    if(e.dataTransfer.files && e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
+  });
+  input.addEventListener("change", e=>{
+    if(e.target.files && e.target.files[0]) handleFile(e.target.files[0]);
+  });
+}
+
+async function handleFile(file){
+  const chipArea = document.getElementById("fileChipArea");
+  const dzText = document.getElementById("dropzoneText");
+  const nameLower = file.name.toLowerCase();
+  dzText.textContent = "Lendo arquivo...";
+  try{
+    let text = "";
+    if(nameLower.endsWith(".docx")){
+      if(typeof mammoth === "undefined") throw new Error("leitor de .docx indisponível, tenta colar o texto ou usar .txt");
+      const arrayBuffer = await file.arrayBuffer();
+      const result = await mammoth.extractRawText({arrayBuffer});
+      text = result.value || "";
+    } else {
+      text = await file.text();
+    }
+    if(!text.trim()) throw new Error("arquivo vazio ou sem texto extraível");
+    document.getElementById("fTranscricao").value = text.trim();
+    chipArea.innerHTML = `<div class="file-chip">📄 ${escapeHtml(file.name)} <button type="button" id="btnClearFile" title="Remover">✕</button></div>`;
+    document.getElementById("btnClearFile").addEventListener("click", ()=>{
+      chipArea.innerHTML = "";
+      document.getElementById("fTranscricao").value = "";
+      dzText.textContent = "Arraste o arquivo da transcrição aqui (.txt, .md ou .docx) ou clique para escolher";
+    });
+    dzText.innerHTML = `Arquivo carregado. Arraste outro pra substituir, ou <strong>clique para escolher</strong> outro.`;
+  }catch(err){
+    dzText.textContent = "Arraste o arquivo da transcrição aqui (.txt, .md ou .docx) ou clique para escolher";
+    document.getElementById("formError").innerHTML = `<div class="error-box">Não consegui ler esse arquivo (${escapeHtml(err.message||"erro")}). Cola o texto direto na caixa abaixo.</div>`;
+  }
+}
+
+async function handleAnalisar(){
+  const cliente = document.getElementById("fCliente").value.trim();
+  const vendedor = document.getElementById("fVendedor").value.trim();
+  const dataCall = document.getElementById("fData").value;
+  const framework = document.getElementById("fFramework").value;
+  const transcricao = document.getElementById("fTranscricao").value.trim();
+  const errEl = document.getElementById("formError");
+  errEl.innerHTML = "";
+
+  if(!transcricao || transcricao.length < 200){
+    errEl.innerHTML = '<div class="error-box">Cole a transcrição literal completa da call antes de analisar. Um texto muito curto normalmente é resumo, não transcrição.</div>';
+    return;
+  }
+  if(!getApiKey()){
+    errEl.innerHTML = '<div class="error-box">Salva sua chave da API Anthropic no campo da lateral antes de analisar.</div>';
+    return;
+  }
+
+  const btn = document.getElementById("btnAnalisar");
+  btn.disabled = true;
+  document.getElementById("loadingArea").innerHTML = '<div class="loading-msg"><div class="spinner"></div> Lendo a transcrição e cruzando com os critérios...</div>';
+
+  try{
+    const parsed = await runAnalysis({cliente, vendedor, dataCall, framework, transcricao});
+    const docData = buildDocFromAnalysis({cliente, vendedor, dataCall, framework, transcricao, parsed});
+    currentDoc = docData;
+    renderResults(docData);
+    saveAudit(docData);
+    loadHistory();
+  }catch(e){
+    errEl.innerHTML = `<div class="error-box">Não consegui concluir a análise agora (${escapeHtml(e && e.message ? e.message : "erro desconhecido")}). Tenta de novo em alguns segundos.</div>`;
+    btn.disabled = false;
+    document.getElementById("loadingArea").innerHTML = "";
+  }
+}
+
+/* ============ PROMPT E CHAMADA DE IA ============ */
+function buildPrompt({framework, transcricao}){
+  const useRoteiro = framework==="demo" || framework==="ambos";
+  const useMontanha = framework==="forecast" || framework==="ambos";
+
+  let itemsBlock = "";
+  if(useRoteiro){
+    itemsBlock += "\nITENS DO ROTEIRO DE DEMO ODISSEIA (avalie cada um pelo id):\n";
+    ROTEIRO_ITEMS.forEach(it=> itemsBlock += `- ${it.id} [${it.etapa}]: ${it.texto}\n`);
+  }
+  itemsBlock += "\nITENS DO SPIN SELLING (avalie cada um pelo id, sempre aplicável):\n";
+  SPIN_ITEMS.forEach(it=> itemsBlock += `- ${it.id} [${it.letra}]: ${it.texto}\n`);
+  if(useMontanha){
+    itemsBlock += "\nITENS DO CHECKLIST DE FORECAST A MONTANHA (avalie cada um pelo id):\n";
+    MONTANHA_ITEMS.forEach(it=> itemsBlock += `- ${it.id} (peso ${it.peso}): ${it.texto}\n`);
+  }
+
+  const schemaFields = [];
+  if(useRoteiro) schemaFields.push('"itens_roteiro": [{"id":"r1","veredito":"cumprido|parcial|nao_cumprido|nao_evidenciavel","evidencia":"trecho ou paráfrase curta da transcrição que sustenta o veredito"}, ...]');
+  schemaFields.push('"itens_spin": [{"id":"s1","veredito":"...","evidencia":"..."}, ...]');
+  if(useMontanha) schemaFields.push('"itens_montanha": [{"id":"m1","veredito":"...","evidencia":"..."}, ...]');
+
+  return `
+Você é um gestor comercial sênior fazendo auditoria rigorosa de execução de uma call de vendas B2B SaaS. Sua função é apontar exatamente o que aconteceu e o que não aconteceu na call, com evidência, sem suavizar.
+
+REGRAS DE VEREDITO, aplique para CADA item das listas abaixo:
+- "cumprido": claramente aconteceu, com evidência clara na transcrição.
+- "parcial": aconteceu em parte, ou de forma fraca.
+- "nao_cumprido": claramente não aconteceu, mesmo tendo oportunidade na call.
+- "nao_evidenciavel": não dá para confirmar nem negar com o material disponível.
+Nunca marque "cumprido" sem conseguir citar evidência específica. Na dúvida, marque "nao_evidenciavel" em vez de forçar um veredito para qualquer lado. A evidência deve ser um trecho literal ou paráfrase muito próxima da transcrição, nunca invente fala que não está lá.
+
+${itemsBlock}
+
+RESPONDA APENAS COM UM JSON VÁLIDO (sem markdown, sem crases, sem texto antes ou depois), no formato exato:
+{
+  ${schemaFields.join(",\n  ")},
+  "veredito_gestor": "um parágrafo direto de gestor, sem suavizar, juntando o que foi bem executado, o que não foi, e por que isso importa para o negócio",
+  "momento_decisivo": {"trecho": "o trecho mais decisivo da conversa, uma objeção real, um medo verbalizado ou uma virada, citado ou parafraseado de forma muito próxima do original", "comentario": "o que o vendedor fez bem ou mal exatamente nesse momento"},
+  "preparacao": ["ação concreta 1 ligada a um gap identificado", "ação concreta 2", "ação concreta 3"]
+}
+
+Use TODOS os ids das listas acima, um item por id, sem pular nenhum.
+
+TRANSCRIÇÃO LITERAL DA CALL:
+"""
+${transcricao}
+"""
+`.trim();
+}
+
+async function runAnalysis({cliente, vendedor, dataCall, framework, transcricao}){
+  const prompt = buildPrompt({framework, transcricao});
+  const response = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": getApiKey(),
+      "anthropic-version": "2023-06-01",
+      "anthropic-dangerous-direct-browser-access": "true"
+    },
+    body: JSON.stringify({
+      model: "claude-sonnet-4-6",
+      max_tokens: 4000,
+      messages: [{role:"user", content: prompt}]
+    })
+  });
+  if(!response.ok){
+    let msg = "erro " + response.status;
+    try{ const errBody = await response.json(); if(errBody && errBody.error && errBody.error.message) msg = errBody.error.message; }catch(e){}
+    throw new Error(msg);
+  }
+  const data = await response.json();
+  const textBlock = (data.content||[]).find(b=>b.type==="text");
+  if(!textBlock) throw new Error("resposta da API sem texto");
+  const clean = textBlock.text.replace(/```json|```/g,"").trim();
+  return JSON.parse(clean);
+}
+
+/* ============ MONTAGEM DO DOC ============ */
+function normalizeItems(returned, fixedList){
+  const map = {};
+  (returned||[]).forEach(r=>{ if(r && r.id) map[r.id]=r; });
+  return fixedList.map(f=>{
+    const r = map[f.id];
+    const veredito = r && VERDICT_LABEL[r.veredito] ? r.veredito : "nao_evidenciavel";
+    const evidencia = r && r.evidencia ? String(r.evidencia) : "Item não avaliado pela IA nesta rodada.";
+    return {id:f.id, texto:f.texto, etapa:f.etapa, letra:f.letra, peso:f.peso, veredito, evidencia};
+  });
+}
+
+function buildDocFromAnalysis({cliente, vendedor, dataCall, framework, transcricao, parsed}){
+  const useRoteiro = framework==="demo" || framework==="ambos";
+  const useMontanha = framework==="forecast" || framework==="ambos";
+  const itens_roteiro = useRoteiro ? normalizeItems(parsed.itens_roteiro, ROTEIRO_ITEMS) : [];
+  const itens_spin = normalizeItems(parsed.itens_spin, SPIN_ITEMS);
+  const itens_montanha = useMontanha ? normalizeItems(parsed.itens_montanha, MONTANHA_ITEMS) : [];
+
+  return {
+    cliente: cliente || "Sem nome",
+    vendedor: vendedor || "",
+    data_call: dataCall || "",
+    framework,
+    transcricao,
+    itens_roteiro, itens_spin, itens_montanha,
+    veredito_gestor: (parsed.veredito_gestor||"").toString(),
+    momento_decisivo: parsed.momento_decisivo || {trecho:"", comentario:""},
+    preparacao: Array.isArray(parsed.preparacao) ? parsed.preparacao.slice(0,6) : [],
+    criado_em: new Date().toISOString(),
+  };
+}
+
+function saveAudit(docData){
+  try{
+    const id = "a_" + Date.now();
+    docData.id = id;
+    const raw = localStorage.getItem(LS_KEY_HISTORY);
+    const list = raw ? JSON.parse(raw) : [];
+    list.unshift(docData);
+    localStorage.setItem(LS_KEY_HISTORY, JSON.stringify(list.slice(0,50)));
+  }catch(e){ /* localStorage cheio ou indisponível, segue sem salvar */ }
+}
+
+/* ============ CÁLCULO DE PLACAR ============ */
+function countVerdicts(items){
+  const c = {cumprido:0, parcial:0, nao_cumprido:0, nao_evidenciavel:0};
+  items.forEach(it=> c[it.veredito]++);
+  return c;
+}
+function montanhaScore(items){
+  let score = 0;
+  items.forEach(it=>{
+    if(it.veredito==="cumprido") score += it.peso;
+    else if(it.veredito==="parcial") score += it.peso*0.5;
+  });
+  return Math.round(score*10)/10;
+}
+
+/* ============ RENDER RESULTADOS ============ */
+function frameworkLabel(fw){
+  return fw==="demo" ? "Demo comercial" : fw==="forecast" ? "Negociação avançada / Forecast" : "Roteiro + Forecast";
+}
+
+function renderResults(doc){
+  const allItems = [...doc.itens_roteiro, ...doc.itens_spin, ...doc.itens_montanha];
+  const totalC = countVerdicts(allItems);
+  const totalItens = allItems.length;
+
+  const main = document.getElementById("main");
+  main.innerHTML = `
+    <div class="result-header">
+      <div class="result-title">
+        <h3>${escapeHtml(doc.cliente)} <span class="badge-tipo">${escapeHtml(frameworkLabel(doc.framework))}</span></h3>
+        <div class="meta">${escapeHtml(doc.vendedor||"vendedor não informado")} ${doc.data_call?("· "+escapeHtml(doc.data_call)):""} · gerado em ${new Date(doc.criado_em).toLocaleString("pt-BR")}</div>
+      </div>
+      <div class="top-actions">
+        <button class="btn" id="btnNovaTop">+ Nova auditoria</button>
+        <button class="btn" id="btnExportar">Exportar relatório</button>
+      </div>
+    </div>
+
+    <div class="scoreboard">
+      <div class="score-card total"><div class="num">${totalItens}</div><div class="lbl">Itens avaliados</div></div>
+      <div class="score-card green"><div class="num">${totalC.cumprido}</div><div class="lbl">Cumprido</div></div>
+      <div class="score-card amber"><div class="num">${totalC.parcial}</div><div class="lbl">Parcial</div></div>
+      <div class="score-card red"><div class="num">${totalC.nao_cumprido}</div><div class="lbl">Não cumprido</div></div>
+      <div class="score-card gray"><div class="num">${totalC.nao_evidenciavel}</div><div class="lbl">Não evidenciável</div></div>
+      ${doc.itens_montanha.length ? `<div class="score-card total"><div class="num">${montanhaScore(doc.itens_montanha)}/${MONTANHA_MAX}</div><div class="lbl">Score A Montanha</div></div>` : ""}
+    </div>
+
+    <div class="section-title">Veredito do gestor</div>
+    <div class="verdict-box">${escapeHtml(doc.veredito_gestor || "Sem veredito retornado.")}</div>
+
+    ${doc.itens_roteiro.length ? renderFrameworkSection("Roteiro de Demo Odisseia", doc.itens_roteiro, true) : ""}
+    ${renderFrameworkSection("SPIN Selling", doc.itens_spin, false)}
+    ${doc.itens_montanha.length ? renderFrameworkSection("Checklist de Forecast · A Montanha", doc.itens_montanha, false, true) : ""}
+
+    <div class="section-title">O momento mais importante da call</div>
+    <div class="moment-card">
+      <div class="trecho">${escapeHtml(doc.momento_decisivo.trecho || "Não identificado.")}</div>
+      <div class="comentario">${escapeHtml(doc.momento_decisivo.comentario || "")}</div>
+    </div>
+
+    <div class="section-title">Preparação recomendada para a próxima call</div>
+    <ul class="prep-list">
+      ${(doc.preparacao.length ? doc.preparacao : ["Sem recomendações retornadas."]).map((p,i)=>`<li><span class="n">${i+1}.</span> ${escapeHtml(p)}</li>`).join("")}
+    </ul>
+  `;
+  document.getElementById("btnNovaTop").addEventListener("click", ()=>{ currentDoc=null; renderForm(); setActiveHistory(null); });
+  document.getElementById("btnExportar").addEventListener("click", ()=> exportarRelatorio(doc));
+}
+
+function renderFrameworkSection(titulo, items, mostrarEtapa, mostrarPeso){
+  const c = countVerdicts(items);
+  const pct = items.length ? Math.round((c.cumprido/items.length)*100) : 0;
+  return `
+    <div class="section-title">${escapeHtml(titulo)} <span class="pct">${c.cumprido}/${items.length} cumpridos · ${pct}%</span></div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th class="item-col">Item</th>
+          <th class="badge-col">Veredito</th>
+          <th class="evid-col">Evidência</th>
+        </tr></thead>
+        <tbody>
+          ${items.map(it=>`
+            <tr>
+              <td class="item-col">${mostrarEtapa && it.etapa ? `<div style="color:var(--muted);font-weight:500;font-size:11px;margin-bottom:2px;">${escapeHtml(it.etapa)}</div>`:""}${it.letra?`[${it.letra}] `:""}${escapeHtml(it.texto)}${mostrarPeso?` <span style="color:var(--muted);font-weight:500;">(peso ${it.peso})</span>`:""}</td>
+              <td class="badge-col"><span class="badge badge-${it.veredito}">${VERDICT_LABEL[it.veredito]}</span></td>
+              <td class="evid-col">${escapeHtml(it.evidencia)}</td>
+            </tr>
+          `).join("")}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+/* ============ EXPORTAR ============ */
+async function exportarRelatorio(doc){
+  const allItems = [...doc.itens_roteiro, ...doc.itens_spin, ...doc.itens_montanha];
+  const totalC = countVerdicts(allItems);
+  let txt = `AUDITORIA DE CALL · ${doc.cliente}\n`;
+  txt += `Vendedor: ${doc.vendedor||"-"}  |  Data: ${doc.data_call||"-"}  |  Framework: ${frameworkLabel(doc.framework)}\n`;
+  txt += `Gerado em: ${new Date(doc.criado_em).toLocaleString("pt-BR")}\n\n`;
+  txt += `PLACAR GERAL: ${allItems.length} itens | Cumprido ${totalC.cumprido} | Parcial ${totalC.parcial} | Não cumprido ${totalC.nao_cumprido} | Não evidenciável ${totalC.nao_evidenciavel}\n`;
+  if(doc.itens_montanha.length) txt += `Score A Montanha: ${montanhaScore(doc.itens_montanha)}/${MONTANHA_MAX}\n`;
+  txt += `\nVEREDITO DO GESTOR\n${doc.veredito_gestor}\n`;
+
+  function dumpSection(nome, items){
+    txt += `\n${nome.toUpperCase()}\n`;
+    items.forEach(it=>{
+      txt += `- [${VERDICT_LABEL[it.veredito]}] ${it.texto}\n  Evidência: ${it.evidencia}\n`;
+    });
+  }
+  if(doc.itens_roteiro.length) dumpSection("Roteiro de Demo Odisseia", doc.itens_roteiro);
+  dumpSection("SPIN Selling", doc.itens_spin);
+  if(doc.itens_montanha.length) dumpSection("Checklist A Montanha", doc.itens_montanha);
+
+  txt += `\nMOMENTO MAIS IMPORTANTE DA CALL\n${doc.momento_decisivo.trecho}\n${doc.momento_decisivo.comentario}\n`;
+  txt += `\nPREPARAÇÃO RECOMENDADA\n`;
+  doc.preparacao.forEach((p,i)=> txt += `${i+1}. ${p}\n`);
+
+  const blob = new Blob([txt], {type:"text/plain;charset=utf-8"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = `auditoria-${slug(doc.cliente)}.txt`;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+function slug(s){ return (s||"call").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9]+/g,"-").replace(/(^-|-$)/g,"") || "call"; }
+
+/* ============ UTIL ============ */
+function escapeHtml(str){
+  return String(str==null?"":str).replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+}
+
+init();
+</script>
+</body>
+</html>
